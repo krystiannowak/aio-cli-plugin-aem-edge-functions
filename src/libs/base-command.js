@@ -116,7 +116,7 @@ class BaseCommand extends Command {
 
       apiEndpoint = isEdgeDelivery
         ? `https://${environmentName}`
-        : `https://publish-p${programId}-e${environmentId}.adobeaemcloud.com`;
+        : `https://author-p${programId}-e${environmentId}.adobeaemcloud.com`;
     }
 
     apiEndpoint +=
