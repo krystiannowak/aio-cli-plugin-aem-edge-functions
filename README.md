@@ -62,6 +62,8 @@ aio aem edge-functions build
 
 The following command will deploy your package to your edge function. You will need to pass your own function name `<function-name>`, where function-name is the name you gave to your service in the compute configuration file.
 
+To be able to deploy, you need to have the "AEM Administrator" product profile for the author instance of your environment for an AEM as a Cloud Service environment. For Edge Delivery Sites with Adobe Managed CDN you need to the Cloud Manager Deployment Manager product profile. To manage product profiles use the [Admin Console](https://adminconsole.adobe.com/).
+
 ```
 aio aem edge-functions deploy first-compute
 ```

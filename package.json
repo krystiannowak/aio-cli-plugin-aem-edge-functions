@@ -1,7 +1,7 @@
 {
   "name": "@adobe/aio-cli-plugin-aem-edge-functions",
   "description": "Adobe I/O CLI plugin for interacting with AEM Edge Functions",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Adobe Inc.",
   "engines": {
     "npm": ">= 8.0.0",
@@ -15,7 +15,7 @@
     "@inquirer/prompts": "8.1.0",
     "@oclif/core": "2.16.0",
     "chalk": "4.1.2",
-    "jsonwebtoken": "9.0.2",
+    "jsonwebtoken": "9.0.3",
     "open": "10.2.0",
     "ora-classic": "5.4.2"
   },
