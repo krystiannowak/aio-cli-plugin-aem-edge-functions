@@ -39,6 +39,42 @@ const ENV_VAR_MAP = {
   edgefunctions_adc_scopes: 'AEM_EDGE_FUNCTIONS_ADC_SCOPES'
 };
 
+// Keys that can be sourced from the AEM_EDGE_FUNCTIONS_ADC_CONFIG env var
+const ADC_CONFIG_KEY_MAP = {
+  edgefunctions_adc_configured: 'configured',
+  edgefunctions_adc_orgid: 'orgId',
+  edgefunctions_adc_projectid: 'projectId',
+  edgefunctions_adc_workspaceid: 'workspaceId',
+  edgefunctions_adc_client_id: 'clientId',
+  edgefunctions_adc_client_secret: 'clientSecret',
+  edgefunctions_adc_scopes: 'scopes'
+};
+
+let _adcConfigCache; // undefined = not yet parsed, null = parsed but absent/invalid
+
+function parseAdcConfigEnv() {
+  if (_adcConfigCache !== undefined) return _adcConfigCache;
+  const raw = process.env.AEM_EDGE_FUNCTIONS_ADC_CONFIG;
+  if (!raw) {
+    _adcConfigCache = null;
+    return null;
+  }
+  try {
+    const json = JSON.parse(raw);
+    const parsed = BaseCommand.parseAdcConfigJson(json);
+    _adcConfigCache = parsed
+      ? {
+          ...parsed,
+          scopes: Array.isArray(parsed.scopes) ? parsed.scopes.join(',') : parsed.scopes || null,
+          configured: true
+        }
+      : null;
+  } catch {
+    _adcConfigCache = null;
+  }
+  return _adcConfigCache;
+}
+
 const BOOLEAN_CONFIGS = new Set([
   'edgefunctions_edge_delivery',
   'cloudmanager_edge_delivery',
@@ -70,6 +106,55 @@ class BaseCommand extends Command {
   CONFIG_ADC_SCOPES = 'edgefunctions_adc_scopes';
 
   /**
+   * Parse an ADC config JSON object, auto-detecting the format:
+   * - Full format: { project: { ... } } — downloaded from ADC project page
+   * - Credentials-only format: { CLIENT_ID, CLIENT_SECRETS, ORG_ID, SCOPES, ... } — downloaded from ADC credential page
+   *
+   * Returns a normalized object: { format, orgId, projectId, workspaceId, clientId, clientSecret, scopes }
+   * projectId and workspaceId are null in the credentials-only format.
+   */
+  static parseAdcConfigJson(json) {
+    if (!json || typeof json !== 'object') return null;
+
+    // Full project format
+    if (json.project) {
+      const project = json.project;
+      const workspace = project?.workspace;
+      const credential = workspace?.details?.credentials?.find(
+        (c) => c.integration_type === 'oauth_server_to_server'
+      );
+      const oauth = credential?.oauth_server_to_server;
+      if (!oauth) return null;
+      return {
+        format: 'full',
+        orgId: project?.org?.ims_org_id || null,
+        projectId: project?.id || null,
+        workspaceId: workspace?.id || null,
+        clientId: oauth.client_id || null,
+        clientSecret: oauth.client_secrets?.[0] || null,
+        scopes: Array.isArray(oauth.scopes) ? oauth.scopes : []
+      };
+    }
+
+    // Credentials-only format: flat keys CLIENT_ID, CLIENT_SECRETS, ORG_ID, SCOPES
+    if (json.CLIENT_ID) {
+      return {
+        format: 'credentials',
+        orgId: json.ORG_ID || null,
+        projectId: null,
+        workspaceId: null,
+        clientId: json.CLIENT_ID,
+        clientSecret: Array.isArray(json.CLIENT_SECRETS)
+          ? json.CLIENT_SECRETS[0]
+          : json.CLIENT_SECRETS || null,
+        scopes: Array.isArray(json.SCOPES) ? json.SCOPES : json.SCOPES ? [json.SCOPES] : []
+      };
+    }
+
+    return null;
+  }
+
+  /**
    * Get a configuration value, checking environment variables before aio config.
    * Environment variables follow the AEM_EF_* naming convention (see ENV_VAR_MAP).
    * @param {string} key aio config key (e.g. this.CONFIG_ORG)
@@ -79,7 +164,13 @@ class BaseCommand extends Command {
     const envVar = ENV_VAR_MAP[key];
     let value;
     if (envVar && process.env[envVar] !== undefined) {
+      // Individual env var takes highest precedence
       value = process.env[envVar];
+    } else if (ADC_CONFIG_KEY_MAP[key]) {
+      // Fall back to AEM_EDGE_FUNCTIONS_ADC_CONFIG if available
+      const adcConfig = parseAdcConfigEnv();
+      const adcValue = adcConfig?.[ADC_CONFIG_KEY_MAP[key]];
+      value = adcValue !== undefined && adcValue !== null ? adcValue : Config.get(key);
     } else {
       value = Config.get(key);
     }
@@ -150,18 +241,11 @@ class BaseCommand extends Command {
    * @returns {Promise<Object|null>} Token and API key or null
    */
   async getAdcToken() {
-    const adcProjectId = this.getConfig(this.CONFIG_ADC_PROJECT);
-    const adcWorkspaceId = this.getConfig(this.CONFIG_ADC_WORKSPACE);
     const clientId = this.getConfig(this.CONFIG_ADC_CLIENT_ID);
     const clientSecret = this.getConfig(this.CONFIG_ADC_CLIENT_SECRET);
     const scopes = this.getConfig(this.CONFIG_ADC_SCOPES);
 
-    if (!adcProjectId || !adcWorkspaceId || !clientId) {
-      return null;
-    }
-
-    if (!clientSecret) {
-      ux.warn('Client secret not configured. Please run the setup command to configure it.');
+    if (!clientId || !clientSecret || !scopes) {
       return null;
     }
 
