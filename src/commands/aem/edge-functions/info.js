@@ -35,6 +35,7 @@ class InfoCommand extends BaseCommand {
       const programId = this.getConfig(this.CONFIG_PROGRAM);
       const environmentId = this.getConfig(this.CONFIG_ENVIRONMENT);
       const edgeDelivery = this.getConfig(this.CONFIG_EDGE_DELIVERY);
+      const siteDomain = this.getConfig(this.CONFIG_SITE_DOMAIN);
       const adcOrgId = this.getConfig(this.CONFIG_ADC_ORG);
       const adcProjectId = this.getConfig(this.CONFIG_ADC_PROJECT);
       const adcWorkspaceId = this.getConfig(this.CONFIG_ADC_WORKSPACE);
@@ -130,16 +131,23 @@ class InfoCommand extends BaseCommand {
         console.log(`Program Name:           ${chalk.green(programName)}`);
       }
       console.log(
-        `Environment ID:         ${environmentId ? chalk.green(environmentId) : chalk.red('Not set')}`
+        `Edge Delivery:          ${edgeDelivery !== undefined ? (edgeDelivery ? chalk.green('Yes') : chalk.green('No')) : chalk.red('Not set')}`
       );
+      if (!edgeDelivery || (edgeDelivery && environmentId)) {
+        console.log(
+          `Environment ID:         ${environmentId ? chalk.green(environmentId) : chalk.red('Not set')}`
+        );
+      }
       if (cloudManagerFetchFailed && environmentId) {
         console.log(`Environment Name:       ${chalk.yellow('Failed to load')}`);
       } else if (environmentName) {
         console.log(`Environment Name:       ${chalk.green(environmentName)}`);
       }
-      console.log(
-        `Edge Delivery:          ${edgeDelivery !== undefined ? (edgeDelivery ? chalk.green('Yes') : chalk.yellow('No')) : chalk.red('Not set')}`
-      );
+      if (edgeDelivery || (!edgeDelivery && siteDomain)) {
+        console.log(
+          `Site Domain:            ${siteDomain ? chalk.green(siteDomain) : chalk.red('Not set')}`
+        );
+      }
 
       // Display ADC configuration if available
       if (adcProjectId || adcWorkspaceId) {

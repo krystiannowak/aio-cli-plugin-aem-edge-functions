@@ -250,7 +250,7 @@ class BaseCommand extends Command {
       const siteDomain =
         this.getConfig(this.CONFIG_SITE_DOMAIN) || this.getConfig(this.CONFIG_SITE_DOMAIN_LEGACY);
 
-      if (!programId || !environmentId) {
+      if (!programId || (isEdgeDelivery && !siteDomain) || (!isEdgeDelivery && !environmentId)) {
         return null;
       }
 
