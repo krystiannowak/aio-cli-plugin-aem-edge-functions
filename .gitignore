@@ -9,6 +9,7 @@ oclif.manifest.json
 node_modules
 .DS_Store
 /test-results.xml
+*.bkp
 
 .vscode/
 coverage/
