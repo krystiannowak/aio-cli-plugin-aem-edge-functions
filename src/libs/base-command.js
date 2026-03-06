@@ -24,6 +24,35 @@ const { createFetch } = require('@adobe/aio-lib-core-networking');
 
 let spinner;
 
+const ENV_VAR_MAP = {
+  cloudmanager_orgid: 'AEM_EDGE_FUNCTIONS_ORG_ID',
+  cloudmanager_programid: 'AEM_EDGE_FUNCTIONS_PROGRAM_ID',
+  cloudmanager_environmentid: 'AEM_EDGE_FUNCTIONS_ENVIRONMENT_ID',
+  edgefunctions_edge_delivery: 'AEM_EDGE_FUNCTIONS_EDGE_DELIVERY',
+  edgefunctions_site_domain: 'AEM_EDGE_FUNCTIONS_SITE_DOMAIN',
+  edgefunctions_adc_configured: 'AEM_EDGE_FUNCTIONS_ADC_CONFIGURED',
+  edgefunctions_adc_orgid: 'AEM_EDGE_FUNCTIONS_ADC_ORG_ID',
+  edgefunctions_adc_projectid: 'AEM_EDGE_FUNCTIONS_ADC_PROJECT_ID',
+  edgefunctions_adc_workspaceid: 'AEM_EDGE_FUNCTIONS_ADC_WORKSPACE_ID',
+  edgefunctions_adc_client_id: 'AEM_EDGE_FUNCTIONS_ADC_CLIENT_ID',
+  edgefunctions_adc_client_secret: 'AEM_EDGE_FUNCTIONS_ADC_CLIENT_SECRET',
+  edgefunctions_adc_scopes: 'AEM_EDGE_FUNCTIONS_ADC_SCOPES'
+};
+
+const BOOLEAN_CONFIGS = new Set([
+  'edgefunctions_edge_delivery',
+  'cloudmanager_edge_delivery',
+  'edgefunctions_adc_configured'
+]);
+
+function parseBool(value) {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'boolean') return value;
+  if (value === 'true' || value === '1' || value === 1) return true;
+  if (value === 'false' || value === '0' || value === 0) return false;
+  return undefined;
+}
+
 class BaseCommand extends Command {
   CONFIG_ORG = 'cloudmanager_orgid';
   CONFIG_PROGRAM = 'cloudmanager_programid';
@@ -39,6 +68,23 @@ class BaseCommand extends Command {
   CONFIG_ADC_CLIENT_ID = 'edgefunctions_adc_client_id';
   CONFIG_ADC_CLIENT_SECRET = 'edgefunctions_adc_client_secret';
   CONFIG_ADC_SCOPES = 'edgefunctions_adc_scopes';
+
+  /**
+   * Get a configuration value, checking environment variables before aio config.
+   * Environment variables follow the AEM_EF_* naming convention (see ENV_VAR_MAP).
+   * @param {string} key aio config key (e.g. this.CONFIG_ORG)
+   * @returns {string|undefined} The configuration value
+   */
+  getConfig(key) {
+    const envVar = ENV_VAR_MAP[key];
+    let value;
+    if (envVar && process.env[envVar] !== undefined) {
+      value = process.env[envVar];
+    } else {
+      value = Config.get(key);
+    }
+    return BOOLEAN_CONFIGS.has(key) ? parseBool(value) : value;
+  }
 
   async init() {
     await super.init();
@@ -104,11 +150,11 @@ class BaseCommand extends Command {
    * @returns {Promise<Object|null>} Token and API key or null
    */
   async getAdcToken() {
-    const adcProjectId = Config.get(this.CONFIG_ADC_PROJECT);
-    const adcWorkspaceId = Config.get(this.CONFIG_ADC_WORKSPACE);
-    const clientId = Config.get(this.CONFIG_ADC_CLIENT_ID);
-    const clientSecret = Config.get(this.CONFIG_ADC_CLIENT_SECRET) || process.env.ADC_CLIENT_SECRET;
-    const scopes = Config.get(this.CONFIG_ADC_SCOPES);
+    const adcProjectId = this.getConfig(this.CONFIG_ADC_PROJECT);
+    const adcWorkspaceId = this.getConfig(this.CONFIG_ADC_WORKSPACE);
+    const clientId = this.getConfig(this.CONFIG_ADC_CLIENT_ID);
+    const clientSecret = this.getConfig(this.CONFIG_ADC_CLIENT_SECRET);
+    const scopes = this.getConfig(this.CONFIG_ADC_SCOPES);
 
     if (!adcProjectId || !adcWorkspaceId || !clientId) {
       return null;
@@ -197,11 +243,12 @@ class BaseCommand extends Command {
 
     if (!apiEndpoint) {
       const isEdgeDelivery =
-        Config.get(this.CONFIG_EDGE_DELIVERY) || Config.get(this.CONFIG_EDGE_DELIVERY_LEGACY);
-      const programId = Config.get(this.CONFIG_PROGRAM);
-      const environmentId = Config.get(this.CONFIG_ENVIRONMENT);
+        this.getConfig(this.CONFIG_EDGE_DELIVERY) ||
+        this.getConfig(this.CONFIG_EDGE_DELIVERY_LEGACY);
+      const programId = this.getConfig(this.CONFIG_PROGRAM);
+      const environmentId = this.getConfig(this.CONFIG_ENVIRONMENT);
       const siteDomain =
-        Config.get(this.CONFIG_SITE_DOMAIN) || Config.get(this.CONFIG_SITE_DOMAIN_LEGACY);
+        this.getConfig(this.CONFIG_SITE_DOMAIN) || this.getConfig(this.CONFIG_SITE_DOMAIN_LEGACY);
 
       if (!programId || !environmentId) {
         return null;
@@ -226,7 +273,7 @@ class BaseCommand extends Command {
     let accessToken = process.env.AEM_EDGE_FUNCTIONS_TOKEN;
 
     if (!accessToken) {
-      const adcConfigured = Config.get(this.CONFIG_ADC_CONFIGURED);
+      const adcConfigured = this.getConfig(this.CONFIG_ADC_CONFIGURED);
 
       if (adcConfigured) {
         try {

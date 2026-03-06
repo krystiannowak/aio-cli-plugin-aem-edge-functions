@@ -13,7 +13,6 @@
 'use strict';
 
 const BaseCommand = require('../../../libs/base-command');
-const Config = require('@adobe/aio-lib-core-config');
 const chalk = require('chalk');
 const { Flags } = require('@oclif/core');
 const { Cloudmanager } = require('../../../libs/cloudmanager');
@@ -32,13 +31,13 @@ class InfoCommand extends BaseCommand {
     try {
       console.log(chalk.bold('\nCurrent AEM Edge Functions Configuration:\n'));
 
-      const orgId = Config.get(this.CONFIG_ORG);
-      const programId = Config.get(this.CONFIG_PROGRAM);
-      const environmentId = Config.get(this.CONFIG_ENVIRONMENT);
-      const edgeDelivery = Config.get(this.CONFIG_EDGE_DELIVERY);
-      const adcOrgId = Config.get(this.CONFIG_ADC_ORG);
-      const adcProjectId = Config.get(this.CONFIG_ADC_PROJECT);
-      const adcWorkspaceId = Config.get(this.CONFIG_ADC_WORKSPACE);
+      const orgId = this.getConfig(this.CONFIG_ORG);
+      const programId = this.getConfig(this.CONFIG_PROGRAM);
+      const environmentId = this.getConfig(this.CONFIG_ENVIRONMENT);
+      const edgeDelivery = this.getConfig(this.CONFIG_EDGE_DELIVERY);
+      const adcOrgId = this.getConfig(this.CONFIG_ADC_ORG);
+      const adcProjectId = this.getConfig(this.CONFIG_ADC_PROJECT);
+      const adcWorkspaceId = this.getConfig(this.CONFIG_ADC_WORKSPACE);
 
       // Fetch names from APIs
       let programName = null;
@@ -240,7 +239,7 @@ class InfoCommand extends BaseCommand {
             let tokenType = 'environment variable';
 
             if (!accessToken) {
-              const adcConfigured = Config.get(this.CONFIG_ADC_CONFIGURED);
+              const adcConfigured = this.getConfig(this.CONFIG_ADC_CONFIGURED);
 
               if (adcConfigured) {
                 try {

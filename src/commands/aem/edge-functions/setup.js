@@ -57,7 +57,7 @@ class SetupCommand extends BaseCommand {
 
       let edgeDelivery = await confirm({
         message: 'Do you want to use an Edge Delivery site?',
-        default: Config.get(this.CONFIG_EDGE_DELIVERY)
+        default: this.getConfig(this.CONFIG_EDGE_DELIVERY)
       });
 
       if (edgeDelivery) {
@@ -109,7 +109,7 @@ class SetupCommand extends BaseCommand {
       const useADC = await confirm({
         message:
           'Do you want to configure Adobe Developer Console (ADC) project for API credentials?',
-        default: !!Config.get(this.CONFIG_ADC_PROJECT)
+        default: !!this.getConfig(this.CONFIG_ADC_PROJECT)
       });
 
       if (useADC) {
@@ -171,7 +171,7 @@ class SetupCommand extends BaseCommand {
         }
       } else {
         // Check if ADC configuration exists
-        const hasAdcConfig = Config.get(this.CONFIG_ADC_CONFIGURED);
+        const hasAdcConfig = this.getConfig(this.CONFIG_ADC_CONFIGURED);
 
         if (hasAdcConfig) {
           const deleteConfig = await confirm({
@@ -275,7 +275,7 @@ class SetupCommand extends BaseCommand {
     }));
     const organizationId = await search({
       message: 'Please choose an organization (type to filter):',
-      default: Config.get(this.CONFIG_ORG),
+      default: this.getConfig(this.CONFIG_ORG),
       pageSize: 30,
       source: async (term, opt) => {
         const input = term || '';
@@ -347,21 +347,22 @@ class SetupCommand extends BaseCommand {
   }
 
   getCliOrgId() {
-    return Config.get(this.CONFIG_ORG) || Config.get('console.org.code');
+    return this.getConfig(this.CONFIG_ORG) || Config.get('console.org.code');
   }
 
   getEnvironmentFromConf() {
-    const id = Config.get(this.CONFIG_ENVIRONMENT);
+    const id = this.getConfig(this.CONFIG_ENVIRONMENT);
     return { prevEnvId: id };
   }
 
   getProgramFromConf() {
-    const id = Config.get(this.CONFIG_PROGRAM);
+    const id = this.getConfig(this.CONFIG_PROGRAM);
     return { prevProgramId: id };
   }
 
   getSiteFromConf() {
-    const id = Config.get(this.CONFIG_SITE_DOMAIN) || Config.get(this.CONFIG_SITE_DOMAIN_LEGACY);
+    const id =
+      this.getConfig(this.CONFIG_SITE_DOMAIN) || this.getConfig(this.CONFIG_SITE_DOMAIN_LEGACY);
     return { prevSiteId: id };
   }
 
@@ -471,7 +472,7 @@ class SetupCommand extends BaseCommand {
 
     const programId = await input({
       message: 'Enter Program ID:',
-      default: Config.get(this.CONFIG_PROGRAM),
+      default: this.getConfig(this.CONFIG_PROGRAM),
       validate: (value) => {
         if (!value || value.trim() === '') {
           return 'Program ID is required';
@@ -506,7 +507,7 @@ class SetupCommand extends BaseCommand {
 
     const environmentId = await input({
       message: 'Enter Environment ID:',
-      default: Config.get(this.CONFIG_ENVIRONMENT),
+      default: this.getConfig(this.CONFIG_ENVIRONMENT),
       validate: (value) => {
         if (!value || value.trim() === '') {
           return 'Environment ID is required';
@@ -543,7 +544,7 @@ class SetupCommand extends BaseCommand {
 
     const siteName = await input({
       message: 'Enter Site/Domain Name (e.g., www.yourdomain.com):',
-      default: Config.get(this.CONFIG_SITE_DOMAIN) || 'www.yourdomain.com',
+      default: this.getConfig(this.CONFIG_SITE_DOMAIN) || 'www.yourdomain.com',
       validate: (value) => {
         if (!value || value.trim() === '') {
           return 'Site/Domain name is required';
@@ -603,7 +604,7 @@ class SetupCommand extends BaseCommand {
       value: project.id
     }));
 
-    const prevProjectId = Config.get(this.CONFIG_ADC_PROJECT);
+    const prevProjectId = this.getConfig(this.CONFIG_ADC_PROJECT);
 
     const selectedProject = await search({
       message: 'Please choose an Adobe Developer Console project (type to filter):',
@@ -643,7 +644,7 @@ class SetupCommand extends BaseCommand {
       value: workspace.id
     }));
 
-    const prevWorkspaceId = Config.get(this.CONFIG_ADC_WORKSPACE);
+    const prevWorkspaceId = this.getConfig(this.CONFIG_ADC_WORKSPACE);
 
     const selectedWorkspace = await search({
       message: 'Please choose a workspace (type to filter):',
@@ -695,8 +696,7 @@ class SetupCommand extends BaseCommand {
   async configureClientSecret(projectId, workspaceId, credentialId, storeLocal) {
     try {
       // Check if client secret already exists
-      const existingSecret =
-        Config.get(this.CONFIG_ADC_CLIENT_SECRET) || process.env.ADC_CLIENT_SECRET;
+      const existingSecret = this.getConfig(this.CONFIG_ADC_CLIENT_SECRET);
 
       if (existingSecret) {
         const updateSecret = await confirm({
@@ -748,7 +748,10 @@ class SetupCommand extends BaseCommand {
 
       // Ask where to store the client secret
       const storeChoices = [
-        { name: 'Environment variable (ADC_CLIENT_SECRET) - Recommended', value: 'env' },
+        {
+          name: 'Environment variable (AEM_EDGE_FUNCTIONS_ADC_CLIENT_SECRET) - Recommended',
+          value: 'env'
+        },
         { name: 'Configuration file (plain text - not recommended)', value: 'config' },
         { name: "Don't store (enter each time)", value: 'none' }
       ];
@@ -785,7 +788,7 @@ class SetupCommand extends BaseCommand {
         }
       } else if (storeChoice === 'env') {
         console.log(chalk.cyan('\nTo set the environment variable, run:'));
-        console.log(chalk.white(`  export ADC_CLIENT_SECRET="${clientSecret}"`));
+        console.log(chalk.white(`  export AEM_EDGE_FUNCTIONS_ADC_CLIENT_SECRET="${clientSecret}"`));
         console.log(
           chalk.cyan(
             '\nOr add it to your shell profile (~/.zshrc, ~/.bashrc, etc.) to persist it.\n'
