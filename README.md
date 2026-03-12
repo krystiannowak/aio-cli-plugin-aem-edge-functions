@@ -113,12 +113,12 @@ aio aem edge-functions build
 
 ## Deploy
 
-The following command will deploy your package to your edge function. You will need to pass your own function name `<function-name>`, where function-name is the name you gave to your service in the compute configuration file.
+The following command will deploy your package to your edge function. You will need to pass your own function name `<function-name>`, where function-name is the name you gave to your service in the edge functions configuration file.
 
 To be able to deploy, you need to have the "AEM Administrator" product profile for the author instance of your environment for an AEM as a Cloud Service environment. For Edge Delivery Sites with Adobe Managed CDN you need to the Cloud Manager Deployment Manager product profile. To manage product profiles use the [Admin Console](https://adminconsole.adobe.com/).
 
 ```
-aio aem edge-functions deploy first-compute
+aio aem edge-functions deploy first-function
 ```
 
 ## Local run
@@ -136,5 +136,5 @@ You can learn more about what is supported by Local runtime on [Fastly documenta
 The following command will tail your edge function logs to help you debug your application. You will be able to get runtime `console.log` from your edge function directly in your terminal.
 
 ```
-aio aem edge-functions tail-logs first-compute
+aio aem edge-functions tail-logs first-function
 ```
