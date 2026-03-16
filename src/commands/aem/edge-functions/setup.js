@@ -19,11 +19,20 @@ const { confirm, input, password, search } = require('@inquirer/prompts');
 const chalk = require('chalk');
 const { Cloudmanager } = require('../../../libs/cloudmanager');
 const { DeveloperConsole } = require('../../../libs/developer-console');
+const { Flags } = require('@oclif/core');
 const fs = require('fs');
 const path = require('path');
 
 class SetupCommand extends BaseCommand {
   static description = 'Setup your AEM Edge Functions environment.';
+
+  static flags = {
+    'adc-config': Flags.string({
+      char: 'c',
+      description: 'Path to an ADC project JSON file downloaded from Adobe Developer Console.',
+      required: false
+    })
+  };
 
   constructor(argv, config) {
     super(argv, config);
@@ -57,7 +66,7 @@ class SetupCommand extends BaseCommand {
 
       let edgeDelivery = await confirm({
         message: 'Do you want to use an Edge Delivery site?',
-        default: Config.get(this.CONFIG_EDGE_DELIVERY)
+        default: this.getConfig(this.CONFIG_EDGE_DELIVERY)
       });
 
       if (edgeDelivery) {
@@ -106,97 +115,173 @@ class SetupCommand extends BaseCommand {
       }
 
       // Adobe Developer Console integration
-      const useADC = await confirm({
-        message:
-          'Do you want to configure Adobe Developer Console (ADC) project for API credentials?',
-        default: !!Config.get(this.CONFIG_ADC_PROJECT)
-      });
+      const adcProjectData = this.readAdcProjectFile();
 
-      if (useADC) {
-        const selectedProjectId = await this.getADCProjectId();
-        if (selectedProjectId) {
-          const selectedWorkspaceId = await this.getADCWorkspaceId(selectedProjectId);
+      if (adcProjectData) {
+        console.log(chalk.bold('\nADC config file loaded:'));
+        if (adcProjectData.orgId)
+          console.log(`  Org ID:       ${chalk.green(adcProjectData.orgId)}`);
+        if (adcProjectData.projectId)
+          console.log(`  Project ID:   ${chalk.green(adcProjectData.projectId)}`);
+        if (adcProjectData.workspaceId)
+          console.log(`  Workspace ID: ${chalk.green(adcProjectData.workspaceId)}`);
+        console.log(`  Client ID:    ${chalk.green(adcProjectData.clientId)}`);
+        console.log(
+          `  Client Secret:${adcProjectData.clientSecret ? chalk.green(' Set') : chalk.yellow(' Not present')}`
+        );
+        console.log(
+          `  Scopes:       ${adcProjectData.scopes.length ? chalk.green(adcProjectData.scopes.join(', ')) : chalk.yellow('None')}`
+        );
+        console.log(chalk.green('✓ ADC credentials successfully loaded from config file.'));
+      }
 
-          const selectedProjectTitle = this.projectsCached.find(
-            (p) => p.id === selectedProjectId
-          )?.title;
-          const selectedWorkspaceName = this.workspacesCached.find(
-            (w) => w.id === selectedWorkspaceId
-          )?.name;
+      if (adcProjectData && adcProjectData.format === 'full') {
+        // Full project format — apply everything from file without prompting
+        const {
+          orgId: adcOrgId,
+          projectId,
+          workspaceId,
+          clientId,
+          clientSecret,
+          scopes
+        } = adcProjectData;
+        if (adcOrgId) Config.set(this.CONFIG_ADC_ORG, adcOrgId, storeLocal);
+        Config.set(this.CONFIG_ADC_CONFIGURED, true, storeLocal);
+        Config.set(this.CONFIG_ADC_PROJECT, projectId, storeLocal);
+        Config.set(this.CONFIG_ADC_WORKSPACE, workspaceId, storeLocal);
+        Config.set(this.CONFIG_ADC_CLIENT_ID, clientId, storeLocal);
+        Config.set(this.CONFIG_ADC_SCOPES, scopes.join(','), storeLocal);
+        if (clientSecret) {
+          await this.storeClientSecret(clientSecret, storeLocal);
+          console.log(chalk.green('✓ ADC configuration loaded from config file.'));
+        } else {
+          console.log(
+            chalk.green('✓ ADC configuration loaded from config file (no client secret in file).')
+          );
+          console.log(
+            chalk.yellow(
+              `  Set the client secret via: export AEM_EDGE_FUNCTIONS_ADC_CLIENT_SECRET="<secret>"`
+            )
+          );
+        }
+      } else if (adcProjectData && adcProjectData.format === 'credentials') {
+        // Credentials-only format — client ID is known, no need to select project/workspace
+        const { orgId: adcOrgId, clientId, clientSecret, scopes } = adcProjectData;
+        if (adcOrgId) Config.set(this.CONFIG_ADC_ORG, adcOrgId, storeLocal);
+        Config.set(this.CONFIG_ADC_CONFIGURED, true, storeLocal);
+        Config.set(this.CONFIG_ADC_CLIENT_ID, clientId, storeLocal);
+        Config.set(this.CONFIG_ADC_SCOPES, scopes.join(','), storeLocal);
+        if (clientSecret) {
+          await this.storeClientSecret(clientSecret, storeLocal);
+          console.log(chalk.green('✓ ADC configuration saved.'));
+        } else {
+          console.log(chalk.green('✓ ADC configuration saved (no client secret in file).'));
+          console.log(
+            chalk.yellow(
+              `  Set the client secret via: export AEM_EDGE_FUNCTIONS_ADC_CLIENT_SECRET="<secret>"`
+            )
+          );
+        }
+      } else {
+        const useADC = await confirm({
+          message:
+            'Do you want to configure Adobe Developer Console (ADC) project for API credentials?',
+          default: !!this.getConfig(this.CONFIG_ADC_PROJECT)
+        });
 
-          if (selectedProjectId && selectedWorkspaceId) {
-            console.log(
-              chalk.green(
-                `Selected ADC project ${selectedProjectId} and workspace ${selectedWorkspaceId}: ${selectedProjectTitle} - ${selectedWorkspaceName}`
-              )
-            );
+        if (useADC) {
+          const existingClientId = this.getConfig(this.CONFIG_ADC_CLIENT_ID);
+          if (existingClientId) {
+            // Credentials already configured — only prompt for client secret
+            console.log(chalk.green(`Using existing ADC client ID: ${existingClientId}`));
+            await this.configureClientSecret(null, null, null, storeLocal);
+          } else {
+            const selectedProjectId = await this.getADCProjectId();
+            if (selectedProjectId) {
+              const selectedWorkspaceId = await this.getADCWorkspaceId(selectedProjectId);
 
-            // Get and save the ADC org ID
-            const adcOrgId = this._developerConsole
-              ? await this._developerConsole._getAdcOrgId()
-              : null;
+              const selectedProjectTitle = this.projectsCached.find(
+                (p) => p.id === selectedProjectId
+              )?.title;
+              const selectedWorkspaceName = this.workspacesCached.find(
+                (w) => w.id === selectedWorkspaceId
+              )?.name;
 
-            // Save ADC configuration first
-            if (adcOrgId) {
-              Config.set(this.CONFIG_ADC_ORG, adcOrgId, storeLocal);
+              if (selectedProjectId && selectedWorkspaceId) {
+                console.log(
+                  chalk.green(
+                    `Selected ADC project ${selectedProjectId} and workspace ${selectedWorkspaceId}: ${selectedProjectTitle} - ${selectedWorkspaceName}`
+                  )
+                );
+
+                // Get and save the ADC org ID
+                const adcOrgId = this._developerConsole
+                  ? await this._developerConsole._getAdcOrgId()
+                  : null;
+
+                // Save ADC configuration first
+                if (adcOrgId) {
+                  Config.set(this.CONFIG_ADC_ORG, adcOrgId, storeLocal);
+                }
+
+                Config.set(this.CONFIG_ADC_CONFIGURED, true, storeLocal);
+                Config.set(this.CONFIG_ADC_PROJECT, selectedProjectId, storeLocal);
+                Config.set(this.CONFIG_ADC_WORKSPACE, selectedWorkspaceId, storeLocal);
+
+                // Get OAuth credentials and scopes
+                const credentials = await this.getCredentialsAndScopes(
+                  selectedProjectId,
+                  selectedWorkspaceId,
+                  storeLocal
+                );
+
+                if (credentials) {
+                  // Configure client secret
+                  await this.configureClientSecret(
+                    selectedProjectId,
+                    selectedWorkspaceId,
+                    credentials.credentialId,
+                    storeLocal
+                  );
+                } else {
+                  console.log(
+                    chalk.yellow(
+                      'ADC configuration saved, but credentials could not be retrieved. You can run setup again to configure the client secret.'
+                    )
+                  );
+                }
+              }
             }
+          } // end: no existingClientId
+        } else {
+          // Check if ADC configuration exists
+          const hasAdcConfig = this.getConfig(this.CONFIG_ADC_CONFIGURED);
 
-            Config.set(this.CONFIG_ADC_CONFIGURED, true, storeLocal);
-            Config.set(this.CONFIG_ADC_PROJECT, selectedProjectId, storeLocal);
-            Config.set(this.CONFIG_ADC_WORKSPACE, selectedWorkspaceId, storeLocal);
+          if (hasAdcConfig) {
+            const deleteConfig = await confirm({
+              message: 'Existing ADC configuration found. Do you want to delete it?',
+              default: false
+            });
 
-            // Get OAuth credentials and scopes
-            const credentials = await this.getCredentialsAndScopes(
-              selectedProjectId,
-              selectedWorkspaceId,
-              storeLocal
-            );
-
-            if (credentials) {
-              // Configure client secret
-              await this.configureClientSecret(
-                selectedProjectId,
-                selectedWorkspaceId,
-                credentials.credentialId,
-                storeLocal
-              );
+            if (deleteConfig) {
+              Config.delete(this.CONFIG_ADC_CONFIGURED, storeLocal);
+              Config.delete(this.CONFIG_ADC_ORG, storeLocal);
+              Config.delete(this.CONFIG_ADC_PROJECT, storeLocal);
+              Config.delete(this.CONFIG_ADC_WORKSPACE, storeLocal);
+              Config.delete(this.CONFIG_ADC_CLIENT_ID, storeLocal);
+              Config.delete(this.CONFIG_ADC_CLIENT_SECRET, storeLocal);
+              Config.delete(this.CONFIG_ADC_SCOPES, storeLocal);
+              console.log(chalk.green('✓ ADC configuration deleted.'));
             } else {
               console.log(
                 chalk.yellow(
-                  'ADC configuration saved, but credentials could not be retrieved. You can run setup again to configure the client secret.'
+                  'ADC configuration kept. You can delete it later by running setup again.'
                 )
               );
             }
           }
         }
-      } else {
-        // Check if ADC configuration exists
-        const hasAdcConfig = Config.get(this.CONFIG_ADC_CONFIGURED);
-
-        if (hasAdcConfig) {
-          const deleteConfig = await confirm({
-            message: 'Existing ADC configuration found. Do you want to delete it?',
-            default: false
-          });
-
-          if (deleteConfig) {
-            Config.delete(this.CONFIG_ADC_CONFIGURED, storeLocal);
-            Config.delete(this.CONFIG_ADC_ORG, storeLocal);
-            Config.delete(this.CONFIG_ADC_PROJECT, storeLocal);
-            Config.delete(this.CONFIG_ADC_WORKSPACE, storeLocal);
-            Config.delete(this.CONFIG_ADC_CLIENT_ID, storeLocal);
-            Config.delete(this.CONFIG_ADC_CLIENT_SECRET, storeLocal);
-            Config.delete(this.CONFIG_ADC_SCOPES, storeLocal);
-            console.log(chalk.green('✓ ADC configuration deleted.'));
-          } else {
-            console.log(
-              chalk.yellow(
-                'ADC configuration kept. You can delete it later by running setup again.'
-              )
-            );
-          }
-        }
-      }
+      } // end: no adcProjectData
 
       console.log(
         `Setup complete. Use 'aio help aem edge-functions' to see the available commands.`
@@ -275,7 +360,7 @@ class SetupCommand extends BaseCommand {
     }));
     const organizationId = await search({
       message: 'Please choose an organization (type to filter):',
-      default: Config.get(this.CONFIG_ORG),
+      default: this.getConfig(this.CONFIG_ORG),
       pageSize: 30,
       source: async (term, opt) => {
         const input = term || '';
@@ -347,21 +432,22 @@ class SetupCommand extends BaseCommand {
   }
 
   getCliOrgId() {
-    return Config.get(this.CONFIG_ORG) || Config.get('console.org.code');
+    return this.getConfig(this.CONFIG_ORG) || Config.get('console.org.code');
   }
 
   getEnvironmentFromConf() {
-    const id = Config.get(this.CONFIG_ENVIRONMENT);
+    const id = this.getConfig(this.CONFIG_ENVIRONMENT);
     return { prevEnvId: id };
   }
 
   getProgramFromConf() {
-    const id = Config.get(this.CONFIG_PROGRAM);
+    const id = this.getConfig(this.CONFIG_PROGRAM);
     return { prevProgramId: id };
   }
 
   getSiteFromConf() {
-    const id = Config.get(this.CONFIG_SITE_DOMAIN) || Config.get(this.CONFIG_SITE_DOMAIN_LEGACY);
+    const id =
+      this.getConfig(this.CONFIG_SITE_DOMAIN) || this.getConfig(this.CONFIG_SITE_DOMAIN_LEGACY);
     return { prevSiteId: id };
   }
 
@@ -471,7 +557,7 @@ class SetupCommand extends BaseCommand {
 
     const programId = await input({
       message: 'Enter Program ID:',
-      default: Config.get(this.CONFIG_PROGRAM),
+      default: this.getConfig(this.CONFIG_PROGRAM),
       validate: (value) => {
         if (!value || value.trim() === '') {
           return 'Program ID is required';
@@ -506,7 +592,7 @@ class SetupCommand extends BaseCommand {
 
     const environmentId = await input({
       message: 'Enter Environment ID:',
-      default: Config.get(this.CONFIG_ENVIRONMENT),
+      default: this.getConfig(this.CONFIG_ENVIRONMENT),
       validate: (value) => {
         if (!value || value.trim() === '') {
           return 'Environment ID is required';
@@ -543,7 +629,7 @@ class SetupCommand extends BaseCommand {
 
     const siteName = await input({
       message: 'Enter Site/Domain Name (e.g., www.yourdomain.com):',
-      default: Config.get(this.CONFIG_SITE_DOMAIN) || 'www.yourdomain.com',
+      default: this.getConfig(this.CONFIG_SITE_DOMAIN) || 'www.yourdomain.com',
       validate: (value) => {
         if (!value || value.trim() === '') {
           return 'Site/Domain name is required';
@@ -603,7 +689,7 @@ class SetupCommand extends BaseCommand {
       value: project.id
     }));
 
-    const prevProjectId = Config.get(this.CONFIG_ADC_PROJECT);
+    const prevProjectId = this.getConfig(this.CONFIG_ADC_PROJECT);
 
     const selectedProject = await search({
       message: 'Please choose an Adobe Developer Console project (type to filter):',
@@ -643,7 +729,7 @@ class SetupCommand extends BaseCommand {
       value: workspace.id
     }));
 
-    const prevWorkspaceId = Config.get(this.CONFIG_ADC_WORKSPACE);
+    const prevWorkspaceId = this.getConfig(this.CONFIG_ADC_WORKSPACE);
 
     const selectedWorkspace = await search({
       message: 'Please choose a workspace (type to filter):',
@@ -660,12 +746,14 @@ class SetupCommand extends BaseCommand {
 
   async getCredentialsAndScopes(projectId, workspaceId, storeLocal) {
     try {
+      this.spinnerStart('retrieving OAuth credentials from Adobe Developer Console');
       // Get OAuth credentials
       const credentials = await this.withDeveloperConsole((devConsole) =>
         devConsole.getCredentials(projectId, workspaceId)
       );
 
       if (!credentials || !credentials.clientId || !credentials.credentialId) {
+        this.spinnerStop();
         console.log(
           chalk.yellow('No OAuth Server-to-Server credential found in the selected workspace.')
         );
@@ -679,14 +767,19 @@ class SetupCommand extends BaseCommand {
       const scopes = await this.withDeveloperConsole((devConsole) =>
         devConsole.getCredentialScopes(credentials.credentialId)
       );
+      this.spinnerStop();
 
       // Save client ID and scopes for later use (no ADC API call needed at runtime)
       Config.set(this.CONFIG_ADC_CLIENT_ID, credentials.clientId, storeLocal);
       // Store scopes as comma-separated list
       Config.set(this.CONFIG_ADC_SCOPES, (scopes || []).join(','), storeLocal);
+      console.log(
+        chalk.green('✓ ADC credentials successfully loaded from Adobe Developer Console.')
+      );
 
       return credentials;
     } catch (error) {
+      this.spinnerStop();
       console.log(chalk.yellow(`Failed to retrieve OAuth credentials: ${error.message}`));
       return null;
     }
@@ -695,8 +788,7 @@ class SetupCommand extends BaseCommand {
   async configureClientSecret(projectId, workspaceId, credentialId, storeLocal) {
     try {
       // Check if client secret already exists
-      const existingSecret =
-        Config.get(this.CONFIG_ADC_CLIENT_SECRET) || process.env.ADC_CLIENT_SECRET;
+      const existingSecret = this.getConfig(this.CONFIG_ADC_CLIENT_SECRET);
 
       if (existingSecret) {
         const updateSecret = await confirm({
@@ -710,23 +802,28 @@ class SetupCommand extends BaseCommand {
         }
       }
 
-      // Get credential URL
-      const credentialUrl = await this.withDeveloperConsole((devConsole) =>
-        devConsole.getCredentialUrl(projectId, credentialId)
-      );
+      if (credentialId) {
+        // Get credential URL
+        this.spinnerStart('retrieving credential URL from Adobe Developer Console');
+        const credentialUrl = await this.withDeveloperConsole((devConsole) =>
+          devConsole.getCredentialUrl(projectId, credentialId)
+        );
+        this.spinnerStop();
 
-      console.log(chalk.yellow('\nClient secret is required for API authentication.'));
-      console.log(`You need to retrieve the Client Secret from Adobe Developer Console.`);
-      console.log(`URL: ${chalk.cyan(credentialUrl)}\n`);
+        console.log(chalk.yellow('\nClient secret is required for API authentication.'));
+        console.log(`You need to retrieve the Client Secret from Adobe Developer Console.`);
+        console.log(`URL: ${chalk.cyan(credentialUrl)}\n`);
 
-      const shouldOpen = await confirm({
-        message: 'Would you like to open this URL in your browser?',
-        default: true
-      });
+        const shouldOpen = await confirm({
+          message: 'Would you like to open this URL in your browser?',
+          default: true
+        });
 
-      if (shouldOpen) {
-        const open = (await import('open')).default;
-        await open(credentialUrl);
+        if (shouldOpen) {
+          const open = (await import('open')).default;
+          await open(credentialUrl);
+          console.log(chalk.green('✓ Opened in browser.'));
+        }
       }
 
       console.log('\nPlease copy the Client Secret from the OAuth Server-to-Server credential.');
@@ -746,57 +843,95 @@ class SetupCommand extends BaseCommand {
         return;
       }
 
-      // Ask where to store the client secret
-      const storeChoices = [
-        { name: 'Environment variable (ADC_CLIENT_SECRET) - Recommended', value: 'env' },
-        { name: 'Configuration file (plain text - not recommended)', value: 'config' },
-        { name: "Don't store (enter each time)", value: 'none' }
-      ];
+      await this.storeClientSecret(clientSecret, storeLocal);
+      console.log(chalk.green('✓ ADC client secret configured.'));
+    } catch (error) {
+      this.spinnerStop();
+      console.log(chalk.yellow(`Failed to configure client secret: ${error.message}`));
+    }
+  }
 
-      const storeChoice = await search({
-        message: 'How would you like to store the client secret?',
-        default: 'env',
-        source: async (term) => {
-          const input = term || '';
-          return storeChoices.filter((choice) =>
-            choice.name.toLowerCase().includes(input.toLowerCase())
-          );
-        }
+  async storeClientSecret(clientSecret, storeLocal) {
+    const storeChoices = [
+      {
+        name: 'Environment variable (AEM_EDGE_FUNCTIONS_ADC_CLIENT_SECRET) - Recommended',
+        value: 'env'
+      },
+      { name: 'Configuration file (plain text - not recommended)', value: 'config' },
+      { name: "Don't store (enter each time)", value: 'none' }
+    ];
+
+    console.log('');
+    const storeChoice = await search({
+      message: 'How would you like to store the client secret?',
+      default: 'env',
+      source: async (term) => {
+        const input = term || '';
+        return storeChoices.filter((choice) =>
+          choice.name.toLowerCase().includes(input.toLowerCase())
+        );
+      }
+    });
+
+    if (storeChoice === 'config') {
+      console.log(
+        chalk.yellow(
+          '\n⚠️  WARNING: The client secret will be stored as plain text in the configuration file.'
+        )
+      );
+      console.log(chalk.yellow('This is not recommended for production use.\n'));
+
+      const confirmStore = await confirm({
+        message: 'Do you want to proceed?',
+        default: false
       });
 
-      if (storeChoice === 'config') {
-        console.log(
-          chalk.yellow(
-            '\n⚠️  WARNING: The client secret will be stored as plain text in the configuration file.'
-          )
-        );
-        console.log(chalk.yellow('This is not recommended for production use.\n'));
-
-        const confirmStore = await confirm({
-          message: 'Do you want to proceed?',
-          default: false
-        });
-
-        if (confirmStore) {
-          Config.set(this.CONFIG_ADC_CLIENT_SECRET, clientSecret, storeLocal);
-          console.log(chalk.green('✓ Client secret saved to configuration file.'));
-        } else {
-          console.log('Client secret not saved. You will need to enter it each time.');
-        }
-      } else if (storeChoice === 'env') {
-        console.log(chalk.cyan('\nTo set the environment variable, run:'));
-        console.log(chalk.white(`  export ADC_CLIENT_SECRET="${clientSecret}"`));
-        console.log(
-          chalk.cyan(
-            '\nOr add it to your shell profile (~/.zshrc, ~/.bashrc, etc.) to persist it.\n'
-          )
-        );
+      if (confirmStore) {
+        Config.set(this.CONFIG_ADC_CLIENT_SECRET, clientSecret, storeLocal);
+        console.log(chalk.green('✓ Client secret saved to configuration file.'));
       } else {
         console.log('Client secret not saved. You will need to enter it each time.');
       }
-    } catch (error) {
-      console.log(chalk.yellow(`Failed to configure client secret: ${error.message}`));
+    } else if (storeChoice === 'env') {
+      console.log(chalk.cyan('\nTo set the environment variable, run:'));
+      console.log(chalk.white(`  export AEM_EDGE_FUNCTIONS_ADC_CLIENT_SECRET="${clientSecret}"`));
+      console.log(
+        chalk.cyan('\nOr add it to your shell profile (~/.zshrc, ~/.bashrc, etc.) to persist it.\n')
+      );
+    } else {
+      console.log('Client secret not saved. You will need to enter it each time.');
     }
+  }
+
+  /**
+   * Read and parse the ADC config file from the --adc-config flag.
+   * Supports both the full ADC project format and the credentials-only format.
+   * @returns {Object|null} Parsed ADC credentials or null if flag not provided
+   */
+  readAdcProjectFile() {
+    const filePath = this.flags?.['adc-config'];
+    if (!filePath) return null;
+
+    const resolved = path.resolve(filePath);
+    if (!fs.existsSync(resolved)) {
+      throw new Error(`ADC config file not found: ${resolved}`);
+    }
+
+    let json;
+    try {
+      json = JSON.parse(fs.readFileSync(resolved, 'utf8'));
+    } catch (e) {
+      throw new Error(`Failed to parse ADC config file as JSON: ${e.message}`);
+    }
+
+    const parsed = this.constructor.parseAdcConfigJson(json);
+    if (!parsed) {
+      throw new Error(
+        'Invalid ADC config file: unrecognized format. ' +
+          'Expected a full ADC project JSON or a credentials-only JSON (CLIENT_ID, CLIENT_SECRETS, ORG_ID, SCOPES).'
+      );
+    }
+    return parsed;
   }
 }
 

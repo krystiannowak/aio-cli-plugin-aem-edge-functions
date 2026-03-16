@@ -13,7 +13,6 @@
 'use strict';
 
 const BaseCommand = require('../../../libs/base-command');
-const Config = require('@adobe/aio-lib-core-config');
 const chalk = require('chalk');
 const { Flags } = require('@oclif/core');
 const { Cloudmanager } = require('../../../libs/cloudmanager');
@@ -32,13 +31,14 @@ class InfoCommand extends BaseCommand {
     try {
       console.log(chalk.bold('\nCurrent AEM Edge Functions Configuration:\n'));
 
-      const orgId = Config.get(this.CONFIG_ORG);
-      const programId = Config.get(this.CONFIG_PROGRAM);
-      const environmentId = Config.get(this.CONFIG_ENVIRONMENT);
-      const edgeDelivery = Config.get(this.CONFIG_EDGE_DELIVERY);
-      const adcOrgId = Config.get(this.CONFIG_ADC_ORG);
-      const adcProjectId = Config.get(this.CONFIG_ADC_PROJECT);
-      const adcWorkspaceId = Config.get(this.CONFIG_ADC_WORKSPACE);
+      const orgId = this.getConfig(this.CONFIG_ORG);
+      const programId = this.getConfig(this.CONFIG_PROGRAM);
+      const environmentId = this.getConfig(this.CONFIG_ENVIRONMENT);
+      const edgeDelivery = this.getConfig(this.CONFIG_EDGE_DELIVERY);
+      const siteDomain = this.getConfig(this.CONFIG_SITE_DOMAIN);
+      const adcOrgId = this.getConfig(this.CONFIG_ADC_ORG);
+      const adcProjectId = this.getConfig(this.CONFIG_ADC_PROJECT);
+      const adcWorkspaceId = this.getConfig(this.CONFIG_ADC_WORKSPACE);
 
       // Fetch names from APIs
       let programName = null;
@@ -131,16 +131,23 @@ class InfoCommand extends BaseCommand {
         console.log(`Program Name:           ${chalk.green(programName)}`);
       }
       console.log(
-        `Environment ID:         ${environmentId ? chalk.green(environmentId) : chalk.red('Not set')}`
+        `Edge Delivery:          ${edgeDelivery !== undefined ? (edgeDelivery ? chalk.green('Yes') : chalk.green('No')) : chalk.red('Not set')}`
       );
+      if (!edgeDelivery || (edgeDelivery && environmentId)) {
+        console.log(
+          `Environment ID:         ${environmentId ? chalk.green(environmentId) : chalk.red('Not set')}`
+        );
+      }
       if (cloudManagerFetchFailed && environmentId) {
         console.log(`Environment Name:       ${chalk.yellow('Failed to load')}`);
       } else if (environmentName) {
         console.log(`Environment Name:       ${chalk.green(environmentName)}`);
       }
-      console.log(
-        `Edge Delivery:          ${edgeDelivery !== undefined ? (edgeDelivery ? chalk.green('Yes') : chalk.yellow('No')) : chalk.red('Not set')}`
-      );
+      if (edgeDelivery || (!edgeDelivery && siteDomain)) {
+        console.log(
+          `Site Domain:            ${siteDomain ? chalk.green(siteDomain) : chalk.red('Not set')}`
+        );
+      }
 
       // Display ADC configuration if available
       if (adcProjectId || adcWorkspaceId) {
@@ -207,26 +214,54 @@ class InfoCommand extends BaseCommand {
       // Display computed API endpoint only when debug flag is set
       if (this.flags.debug) {
         const apiEndpoint = this.getApiEndpoint();
+        const adcClientId = this.getConfig(this.CONFIG_ADC_CLIENT_ID);
+        const adcClientSecret = this.getConfig(this.CONFIG_ADC_CLIENT_SECRET);
+        const adcScopes = this.getConfig(this.CONFIG_ADC_SCOPES);
+
+        console.log(chalk.bold('\nADC Credentials:'));
+        console.log(
+          `  Client ID:            ${adcClientId ? chalk.green(adcClientId) : chalk.red('Not set')}`
+        );
+        console.log(
+          `  Client Secret:        ${adcClientSecret ? chalk.green('Set') : chalk.red('Not set')}`
+        );
+        console.log(
+          `  Scopes:               ${adcScopes ? chalk.green(adcScopes) : chalk.red('Not set')}`
+        );
+
+        console.log(chalk.bold('\nActive Environment Variables:'));
+        const envVars = [
+          'AEM_EDGE_FUNCTIONS_ORG_ID',
+          'AEM_EDGE_FUNCTIONS_PROGRAM_ID',
+          'AEM_EDGE_FUNCTIONS_ENVIRONMENT_ID',
+          'AEM_EDGE_FUNCTIONS_EDGE_DELIVERY',
+          'AEM_EDGE_FUNCTIONS_SITE_DOMAIN',
+          'AEM_EDGE_FUNCTIONS_ADC_CONFIG',
+          'AEM_EDGE_FUNCTIONS_ADC_CONFIGURED',
+          'AEM_EDGE_FUNCTIONS_ADC_ORG_ID',
+          'AEM_EDGE_FUNCTIONS_ADC_PROJECT_ID',
+          'AEM_EDGE_FUNCTIONS_ADC_WORKSPACE_ID',
+          'AEM_EDGE_FUNCTIONS_ADC_CLIENT_ID',
+          'AEM_EDGE_FUNCTIONS_ADC_CLIENT_SECRET',
+          'AEM_EDGE_FUNCTIONS_ADC_SCOPES',
+          'AEM_EDGE_FUNCTIONS_TOKEN',
+          'AEM_EDGE_FUNCTIONS_API_ENDPOINT'
+        ];
+        const activeEnvVars = envVars.filter((v) => process.env[v] !== undefined);
+        if (activeEnvVars.length > 0) {
+          for (const v of activeEnvVars) {
+            const isSecret =
+              v.includes('SECRET') || v.includes('TOKEN') || v === 'AEM_EDGE_FUNCTIONS_ADC_CONFIG';
+            const val = isSecret ? chalk.green('Set') : chalk.green(process.env[v]);
+            console.log(`  ${v}=${val}`);
+          }
+        } else {
+          console.log(`  ${chalk.gray('None')}`);
+        }
 
         console.log(
           `\nAPI Endpoint:           ${apiEndpoint ? chalk.cyan(apiEndpoint) : chalk.red('Not available (missing configuration)')}`
         );
-
-        // Display environment variable overrides if set
-        if (process.env.AEM_EDGE_FUNCTIONS_API_ENDPOINT) {
-          console.log(
-            chalk.yellow(
-              '\nNote: AEM_EDGE_FUNCTIONS_API_ENDPOINT environment variable is set and will override computed endpoint.'
-            )
-          );
-        }
-        if (process.env.AEM_EDGE_FUNCTIONS_TOKEN) {
-          console.log(
-            chalk.yellow(
-              'Note: AEM_EDGE_FUNCTIONS_TOKEN environment variable is set and will override IMS token.'
-            )
-          );
-        }
 
         // Test API connectivity and token validity
         if (apiEndpoint) {
@@ -235,13 +270,11 @@ class InfoCommand extends BaseCommand {
             const { createFetch } = require('@adobe/aio-lib-core-networking');
             const fetch = createFetch();
 
-            // For edge function API requests, try to use ADC token if configured
             let accessToken = process.env.AEM_EDGE_FUNCTIONS_TOKEN;
             let tokenType = 'environment variable';
 
             if (!accessToken) {
-              const adcConfigured = Config.get(this.CONFIG_ADC_CONFIGURED);
-
+              const adcConfigured = this.getConfig(this.CONFIG_ADC_CONFIGURED);
               if (adcConfigured) {
                 try {
                   const adcToken = await this.getAdcToken();
@@ -252,29 +285,10 @@ class InfoCommand extends BaseCommand {
                     console.log(
                       `API Status:             ${chalk.red('✗ ADC token retrieval failed')}`
                     );
-                    console.log(chalk.red('\nADC Configuration Error:'));
                     console.log(
-                      chalk.red('  Failed to get ADC token - getAdcToken() returned null/undefined')
-                    );
-                    console.log(chalk.yellow('\nDebugging Information:'));
-                    console.log(`  ADC Org ID:           ${adcOrgId || chalk.red('Not set')}`);
-                    console.log(`  ADC Project ID:       ${adcProjectId || chalk.red('Not set')}`);
-                    console.log(
-                      `  ADC Workspace ID:     ${adcWorkspaceId || chalk.red('Not set')}`
-                    );
-                    console.log(chalk.yellow('\nSuggested Actions:'));
-                    console.log(
-                      chalk.yellow(
-                        '  1. Run "aio aem edge-functions setup" to reconfigure ADC integration'
+                      chalk.red(
+                        '  getAdcToken() returned null — check Client ID, Secret and Scopes above.'
                       )
-                    );
-                    console.log(
-                      chalk.yellow(
-                        '  2. Verify your ADC project has the required credentials configured'
-                      )
-                    );
-                    console.log(
-                      chalk.yellow('  3. Check that your ADC project is properly set up')
                     );
                     return;
                   }
@@ -282,32 +296,10 @@ class InfoCommand extends BaseCommand {
                   console.log(
                     `API Status:             ${chalk.red('✗ ADC token retrieval failed')}`
                   );
-                  console.log(chalk.red('\nADC Configuration Error:'));
                   console.log(chalk.red(`  ${error.message}`));
-                  console.log(chalk.yellow('\nDebugging Information:'));
-                  console.log(`  ADC Org ID:           ${adcOrgId || chalk.red('Not set')}`);
-                  console.log(`  ADC Project ID:       ${adcProjectId || chalk.red('Not set')}`);
-                  console.log(`  ADC Workspace ID:     ${adcWorkspaceId || chalk.red('Not set')}`);
-                  if (error.stack) {
-                    console.log(chalk.gray('\nStack Trace:'));
-                    console.log(chalk.gray(error.stack));
-                  }
-                  console.log(chalk.yellow('\nSuggested Actions:'));
-                  console.log(
-                    chalk.yellow(
-                      '  1. Run "aio aem edge-functions setup" to reconfigure ADC integration'
-                    )
-                  );
-                  console.log(
-                    chalk.yellow(
-                      '  2. Verify your ADC project has the required credentials configured'
-                    )
-                  );
-                  console.log(chalk.yellow('  3. Check that your ADC project is properly set up'));
                   return;
                 }
               } else {
-                // No ADC configured, use IMS token
                 accessToken = (await this.getTokenAndKey())?.accessToken;
                 tokenType = 'IMS';
               }
@@ -315,13 +307,10 @@ class InfoCommand extends BaseCommand {
 
             const response = await fetch(apiEndpoint, {
               method: 'HEAD',
-              headers: {
-                Authorization: `Bearer ${accessToken}`
-              }
+              headers: { Authorization: `Bearer ${accessToken}` }
             });
 
             if (response.ok || response.status === 404) {
-              // 404 is acceptable - it means we can reach the endpoint
               console.log(
                 `API Status:             ${chalk.green('✓ Connected')} (HTTP ${response.status})`
               );
@@ -331,11 +320,6 @@ class InfoCommand extends BaseCommand {
                 `API Status:             ${chalk.red('✗ Authentication failed')} (HTTP ${response.status})`
               );
               console.log(`Token Type:             ${chalk.cyan(tokenType)}`);
-              console.log(
-                chalk.yellow(
-                  'Token may be expired or invalid. Try running setup again or check your IMS context.'
-                )
-              );
             } else {
               console.log(
                 `API Status:             ${chalk.yellow('⚠ Unexpected response')} (HTTP ${response.status})`

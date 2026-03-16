@@ -48,28 +48,69 @@ aio aem edge-functions setup
 
 This command will prompt you to:
 
-1. Select the Cloud Manager organization, program and environment you want to work with
-2. Optionally configure an Adobe Developer Console (ADC) project for API credentials
+1. Select whether to store configuration locally (`.aio` file) or globally
+2. Select the Cloud Manager organization, program and environment you want to work with
+3. Optionally configure Adobe Developer Console (ADC) credentials for API authentication
 
-The configuration may be stored locally in a `.aio` file in the current folder if selected, otherwise in the global aio configuration. This allows you to set up a config for each Edge Function project independently.
+The configuration may be stored locally in a `.aio` file in the current folder if selected, otherwise in the global aio configuration. This allows you to set up an independent config for each Edge Function project.
 
-The deploy and tail-logs commands will use this configuration to identify the correct Cloud Manager environment to deploy to.
+The deploy and tail-logs commands will use this configuration to identify the correct Cloud Manager environment.
 
 ### Adobe Developer Console Integration
 
-During setup, you can optionally configure an Adobe Developer Console project and workspace. This allows you to:
+ADC credentials are required for API authentication. There are three ways to configure them:
 
-- Associate your edge functions with a specific ADC project
-- Use project-specific API credentials
-- Manage multiple environments with different ADC projects
+#### Option 1: ADC Config File (`--adc-config` / `-c`)
 
-When prompted, you can:
+You can download a configuration file directly from Adobe Developer Console and pass it to the setup command. Two file formats are supported and automatically detected:
 
-- Select an existing ADC project from your organization
-- Choose a workspace within that project
-- Skip ADC configuration if not needed
+**Full project format** — downloaded from the project overview page. Contains the full project, workspace and credential information. All fields are read automatically and no further prompts are shown.
 
-The ADC project information will be stored alongside your Cloud Manager configuration for future reference.
+```
+aio aem edge-functions setup --adc-config ./adc-project.json
+```
+
+**Credentials-only format** — downloaded from the credential page. Contains only the OAuth client ID, secret and scopes. The client ID, secret and scopes are read from the file automatically.
+
+```
+aio aem edge-functions setup -c ./adc-credentials.json
+```
+
+In both cases, the recognized values are displayed before they are saved. For the client secret, you will be asked how to store it.
+
+#### Option 2: `AEM_EDGE_FUNCTIONS_ADC_CONFIG` Environment Variable
+
+Instead of a file path, you can provide the same JSON content as an environment variable. This is particularly useful in CI/CD pipelines:
+
+```
+export AEM_EDGE_FUNCTIONS_ADC_CONFIG='{ ... }'
+aio aem edge-functions setup
+```
+
+The same two JSON formats are supported. All ADC values read from this variable are automatically available to all commands without running setup — individual environment variables take precedence over this variable if both are set.
+
+#### Option 3: Interactive / Individual Environment Variables
+
+Without a config file or `AEM_EDGE_FUNCTIONS_ADC_CONFIG`, the setup command will interactively guide you through selecting an ADC project and workspace from your organization. You can also override individual values via environment variables:
+
+| Environment Variable | Description |
+|---|---|
+| `AEM_EDGE_FUNCTIONS_ORG_ID` | Cloud Manager organization ID |
+| `AEM_EDGE_FUNCTIONS_PROGRAM_ID` | Cloud Manager program ID |
+| `AEM_EDGE_FUNCTIONS_ENVIRONMENT_ID` | Cloud Manager environment ID |
+| `AEM_EDGE_FUNCTIONS_EDGE_DELIVERY` | Use Edge Delivery site (`true`/`false`) |
+| `AEM_EDGE_FUNCTIONS_SITE_DOMAIN` | Edge Delivery site domain |
+| `AEM_EDGE_FUNCTIONS_ADC_CLIENT_ID` | ADC OAuth client ID |
+| `AEM_EDGE_FUNCTIONS_ADC_CLIENT_SECRET` | ADC OAuth client secret |
+| `AEM_EDGE_FUNCTIONS_ADC_SCOPES` | ADC OAuth scopes (comma-separated) |
+
+### Client Secret Storage
+
+When a client secret is available (either from a config file or entered manually), you will be asked how to store it:
+
+- **Environment variable** _(recommended)_ — prints the export command to add to your shell profile for persistence
+- **Configuration file** — stores the secret as plain text in the aio config (not recommended for production)
+- **Don't store** — the secret is not persisted; you will need to provide it each time via the environment variable
 
 ## View Configuration
 
@@ -84,24 +125,24 @@ This command displays:
 - Organization ID
 - Program ID and Name
 - Environment ID and Name
-- Edge Delivery site configuration status
+- Edge Delivery configuration and site domain
+- ADC Client ID, and project/workspace details if configured
 - Cloud Manager URL for quick access to your environment
 
 ### Debug Mode
 
-For detailed debugging information, including API endpoint details and token verification, use the `--debug` flag:
+For detailed debugging information use the `--debug` flag:
 
 ```
 aio aem edge-functions info --debug
 ```
 
-In debug mode, the command will additionally:
+In debug mode, the command additionally displays:
 
-- Display the computed API endpoint
-- Show any environment variable overrides
-- Test API connectivity and validate your authentication token
-
-This is useful for troubleshooting authentication issues or verifying your setup before deploying.
+- ADC credential details (Client ID, secret presence, scopes)
+- All active `AEM_EDGE_FUNCTIONS_*` environment variables
+- Edge Functions API endpoint
+- API connectivity test with token type and HTTP status
 
 ## Build
 
