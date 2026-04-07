@@ -1,7 +1,7 @@
 {
   "name": "@adobe/aio-cli-plugin-aem-edge-functions",
   "description": "Adobe I/O CLI plugin for interacting with AEM Edge Functions",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "author": "Adobe Inc.",
   "engines": {
     "npm": ">= 8.0.0",
@@ -9,10 +9,10 @@
   },
   "dependencies": {
     "@adobe/aio-lib-console": "5.5.0",
-    "@adobe/aio-lib-core-config": "^5.0.1",
+    "@adobe/aio-lib-core-config": "5.0.1",
     "@adobe/aio-lib-core-networking": "5.1.0",
     "@adobe/aio-lib-ims": "8.1.1",
-    "@fastly/cli": "^13.3.0",
+    "@fastly/cli": "13.3.0",
     "@inquirer/prompts": "8.3.0",
     "@oclif/core": "2.16.0",
     "chalk": "4.1.2",
@@ -21,16 +21,16 @@
     "ora-classic": "5.4.2"
   },
   "devDependencies": {
-    "@adobe/eslint-config-aio-lib-config": "^4.0.0",
-    "@inquirer/testing": "^2.1.19",
-    "eslint": "^8.56.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-prettier": "^5.1.3",
-    "husky": "^8.0.3",
+    "@adobe/eslint-config-aio-lib-config": "4.0.0",
+    "@inquirer/testing": "2.1.53",
+    "eslint": "8.57.1",
+    "eslint-config-prettier": "9.1.2",
+    "eslint-plugin-prettier": "5.5.5",
+    "husky": "8.0.3",
     "mocha": "12.0.0-beta-10",
-    "nyc": "^15.1.0",
-    "prettier": "^3.3.3",
-    "sinon": "21.0.2"
+    "nyc": "15.1.0",
+    "prettier": "3.8.1",
+    "sinon": "21.0.3"
   },
   "bin": {
     "adobe-aem-edge-functions-cli": "./bin/run"
