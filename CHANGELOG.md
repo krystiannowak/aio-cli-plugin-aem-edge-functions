@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0] - 2026-04-07
+
+### Added
+
+- `version` command — prints the plugin version
+- `help` command — displays all available commands with a numbered full-flow example section
+- Default command — running `aio aem edge-functions` with no subcommand now shows the help output
+
 ## [0.5.1] - 2026-03-17
 
 ### Added
