@@ -39,6 +39,7 @@ Uses **oclif** (`@oclif/core` v2) for command auto-discovery from `src/commands/
 ### BaseCommand
 
 `BaseCommand` is the core of the plugin. It handles:
+
 - **Configuration layering**: env vars (`AEM_EDGE_FUNCTIONS_*`) > ADC config > aio config file (`.aio`)
 - **Auth**: IMS token (primary) and ADC OAuth Server-to-Server credentials (fallback path via `@adobe/aio-lib-ims`)
 - **Shared helpers**: spinner management (`ora-classic`), Fastly CLI initialization, API base path computation
@@ -46,6 +47,7 @@ Uses **oclif** (`@oclif/core` v2) for command auto-discovery from `src/commands/
 ### Configuration Keys
 
 Core config keys used throughout (stored in aio config under `aem.edge-functions.*`):
+
 - `cloudmanager_orgid`, `cloudmanager_programid`, `cloudmanager_environmentid`
 - `edgefunctions_edge_delivery`, `edgefunctions_site_domain`
 - `edgefunctions_adc_client_id`, `edgefunctions_adc_client_secret`, `edgefunctions_adc_scopes`

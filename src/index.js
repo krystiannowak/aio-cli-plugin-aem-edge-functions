@@ -17,6 +17,8 @@ const TailLogsCommand = require('./commands/aem/edge-functions/tail-logs');
 const ServeCommand = require('./commands/aem/edge-functions/serve');
 const InfoCommand = require('./commands/aem/edge-functions/info');
 const VersionCommand = require('./commands/aem/edge-functions/version');
+const HelpCommand = require('./commands/aem/edge-functions/help');
+const DefaultCommand = require('./commands/aem/edge-functions/index');
 
 module.exports = {
   setup: new SetupCommand().run,
@@ -25,5 +27,7 @@ module.exports = {
   serve: new ServeCommand().run,
   'tail-logs': new TailLogsCommand().run,
   info: new InfoCommand().run,
-  version: new VersionCommand().run
+  version: new VersionCommand().run,
+  help: new HelpCommand().run,
+  default: new DefaultCommand().run
 };

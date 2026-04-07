@@ -204,13 +204,13 @@ In a CI/CD pipeline you can avoid any interactive prompts by supplying all requi
 
 Add the following as secret/masked environment variables in your pipeline configuration (GitHub Actions, GitLab CI, Jenkins, etc.):
 
-| Variable                               | Where to find it                                      |
-| -------------------------------------- | ----------------------------------------------------- |
-| `AEM_EDGE_FUNCTIONS_PROGRAM_ID`        | Cloud Manager program ID                              |
-| `AEM_EDGE_FUNCTIONS_ENVIRONMENT_ID`    | Cloud Manager environment ID                          |
-| `AEM_EDGE_FUNCTIONS_ADC_CLIENT_ID`     | ADC project credential page                           |
-| `AEM_EDGE_FUNCTIONS_ADC_CLIENT_SECRET` | ADC project credential page                           |
-| `AEM_EDGE_FUNCTIONS_ADC_SCOPES`        | ADC project credential page (comma-separated)         |
+| Variable                               | Where to find it                              |
+| -------------------------------------- | --------------------------------------------- |
+| `AEM_EDGE_FUNCTIONS_PROGRAM_ID`        | Cloud Manager program ID                      |
+| `AEM_EDGE_FUNCTIONS_ENVIRONMENT_ID`    | Cloud Manager environment ID                  |
+| `AEM_EDGE_FUNCTIONS_ADC_CLIENT_ID`     | ADC project credential page                   |
+| `AEM_EDGE_FUNCTIONS_ADC_CLIENT_SECRET` | ADC project credential page                   |
+| `AEM_EDGE_FUNCTIONS_ADC_SCOPES`        | ADC project credential page (comma-separated) |
 
 Alternatively, download the credentials JSON from Adobe Developer Console and expose it as:
 
