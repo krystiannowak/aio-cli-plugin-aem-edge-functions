@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.12] - 2026-04-16
+
+### Changed
+
+- Limit service name length to max 30 characters
+
 ## [0.6.11] - 2026-04-14
 
 ### Added
