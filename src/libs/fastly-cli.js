@@ -33,10 +33,19 @@ class FastlyCli {
     }
   }
 
+  /**
+   * Validate the service name against the Edge Functions configuration constraints.
+   * Must be 1-30 lowercase alphanumeric/hyphen chars, starting with a letter, not ending with a hyphen.
+   * This limit ensures the resulting backend hostname stays within the 63-octet DNS label limit
+   * per RFC 1035, Section 3.1.
+   */
   ensureServiceIdIsSafe(serviceId) {
-    if (!serviceId || !/^[0-9a-zA-Z_-]+$/.test(serviceId)) {
+    const SERVICE_NAME_PATTERN = /^[a-z]([a-z0-9-]{0,28}[a-z0-9])?$/;
+    if (!serviceId || !SERVICE_NAME_PATTERN.test(serviceId)) {
       throw new Error(
-        'Service ID must contain only alphanumeric characters, underscores, and hyphens'
+        `Invalid service name: '${serviceId}'. ` +
+          'Service name must be 1-30 characters long, start with a lowercase letter, ' +
+          'end with a lowercase letter or digit, and contain only lowercase letters, digits, and hyphens.'
       );
     }
   }
