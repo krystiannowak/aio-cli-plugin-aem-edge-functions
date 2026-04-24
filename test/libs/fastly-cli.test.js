@@ -12,8 +12,121 @@
 
 const assert = require('assert');
 const FastlyCli = require('../../src/libs/fastly-cli');
+const { filterOutput, shouldFilterLine } = require('../../src/libs/fastly-cli');
 
 describe('FastlyCli', function () {
+  describe('#filterOutput', function () {
+    it('should remove "Manage this service at" and "View this service at" blocks', function () {
+      const input = [
+        '✓ Activating service (version 29)',
+        '',
+        'Manage this service at:',
+        '\thttps://manage.fastly.com/configure/services/abc-edgefunc',
+        '',
+        'View this service at:',
+        '\thttps://compute-backend-p42913-e1920257-abc-edgefunc.adobeaemcloud.com',
+        '',
+        'SUCCESS: Deployed package (service abc-edgefunc, version 29)'
+      ].join('\n');
+      const result = filterOutput(input);
+      assert.ok(!result.includes('manage.fastly.com'));
+      assert.ok(!result.includes('Manage this service at'));
+      assert.ok(!result.includes('View this service at'));
+      assert.ok(!result.includes('adobeaemcloud.com'));
+      assert.ok(result.includes('SUCCESS'));
+    });
+
+    it('should remove Fastly CLI upgrade notice', function () {
+      const input = [
+        'SUCCESS: Deployed package (service abc-edgefunc, version 29)',
+        '',
+        'A new version of the Fastly CLI is available.',
+        'Current version: 13.3.0',
+        'Latest version: 14.3.1',
+        'Run `fastly update` to get the latest version.'
+      ].join('\n');
+      const result = filterOutput(input);
+      assert.ok(!result.includes('new version of the Fastly CLI'));
+      assert.ok(!result.includes('Current version'));
+      assert.ok(!result.includes('fastly update'));
+      assert.ok(result.includes('SUCCESS'));
+    });
+
+    it('should remove spinner intermediate frame lines', function () {
+      const input = [
+        '| Uploading package...',
+        '/ Uploading package...',
+        '✓ Uploading package',
+        '| Activating service (version 31)...',
+        '/ Activating service (version 31)...',
+        '✓ Activating service (version 31)'
+      ].join('\n');
+      const result = filterOutput(input);
+      assert.ok(!result.includes('| Uploading'));
+      assert.ok(!result.includes('/ Uploading'));
+      assert.ok(!result.includes('| Activating'));
+      assert.ok(!result.includes('/ Activating'));
+      assert.ok(result.includes('Uploading package'));
+      assert.ok(result.includes('Activating service'));
+    });
+
+    it('should collapse excessive blank lines after filtering', function () {
+      const input = [
+        'line1',
+        '',
+        'Manage this service at:',
+        '\thttps://manage.fastly.com/configure/services/x',
+        '',
+        'line2'
+      ].join('\n');
+      const result = filterOutput(input);
+      assert.ok(!result.includes('\n\n\n'));
+    });
+
+    it('should pass through unrelated output unchanged except for colorization', function () {
+      const input = '✓ Uploading package\n✓ Activating service\n';
+      const result = filterOutput(input);
+      // ✓ should be colorized green
+      assert.ok(result.includes('\x1b[32m✓\x1b[0m Uploading package'));
+      assert.ok(result.includes('\x1b[32m✓\x1b[0m Activating service'));
+    });
+
+    it('should colorize SUCCESS lines', function () {
+      const input = 'SUCCESS: Deployed package (service abc, version 1)';
+      const result = filterOutput(input);
+      assert.ok(result.includes('\x1b[32mSUCCESS:\x1b[0m'));
+    });
+
+    it('should colorize ERROR lines in red', function () {
+      const input = 'ERROR: the Fastly API returned 404 Not Found: .';
+      const result = filterOutput(input);
+      assert.ok(result.includes('\x1b[31mERROR:\x1b[0m'));
+    });
+  });
+
+  describe('#shouldFilterLine', function () {
+    it('should filter lines with ANSI color codes', function () {
+      // Simulated colored "Manage this service at:" line
+      assert.ok(shouldFilterLine('\x1b[32mManage this service at:\x1b[0m'));
+    });
+
+    it('should filter spinner frames with backslash', function () {
+      assert.ok(shouldFilterLine('\\ Verifying fastly.toml...'));
+    });
+
+    it('should filter spinner frames with dash', function () {
+      assert.ok(shouldFilterLine('- Uploading package...'));
+    });
+
+    it('should not filter completed step lines', function () {
+      assert.ok(!shouldFilterLine('✓ Uploading package'));
+    });
+
+    it('should not filter SUCCESS lines', function () {
+      assert.ok(!shouldFilterLine('SUCCESS: Deployed package (service abc, version 1)'));
+    });
+  });
+
   describe('#ensureServiceIdIsSafe', function () {
     it('should accept a valid service name', function () {
       const fastlyCli = new FastlyCli();

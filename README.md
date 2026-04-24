@@ -173,6 +173,14 @@ To be able to deploy, you need to have the "AEM Administrator" product profile f
 aio aem edge-functions deploy first-function
 ```
 
+### Debug Mode
+
+To see the raw, unfiltered output from the underlying CLI (useful for troubleshooting deployment issues), use the `--debug` / `-d` flag:
+
+```
+aio aem edge-functions deploy first-function --debug
+```
+
 ## Local run
 
 The following command will run your edge function code locally and exposed a server at `http://127.0.0.1:7676`
