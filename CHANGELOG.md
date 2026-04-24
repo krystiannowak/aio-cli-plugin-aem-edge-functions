@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.0] - 2026-04-24
+
+### Added
+
+- `deploy --debug` / `-d` flag to show raw, unfiltered deployment output for troubleshooting
+
+### Changed
+
+- Deploy command now filters out unnecessary internal details from deployment output
+- Upgraded `@fastly/cli` from 13.3.0 to 14.3.1
+
 ## [0.6.12] - 2026-04-16
 
 ### Changed

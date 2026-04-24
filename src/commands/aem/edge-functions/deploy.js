@@ -13,7 +13,7 @@
 'use strict';
 
 const BaseCommand = require('../../../libs/base-command');
-const { Args } = require('@oclif/core');
+const { Args, Flags } = require('@oclif/core');
 
 class DeployCommand extends BaseCommand {
   static description = 'Deploy your code to your AEM edge function.';
@@ -23,10 +23,17 @@ class DeployCommand extends BaseCommand {
       required: true
     })
   };
+  static flags = {
+    debug: Flags.boolean({
+      char: 'd',
+      description: 'Show raw Fastly CLI output without filtering',
+      default: false
+    })
+  };
 
   async run() {
     const fastly = await this.getFastlyCli();
-    await fastly.deploy(this.args.serviceId);
+    await fastly.deploy(this.args.serviceId, { debug: this.flags.debug });
   }
 }
 
