@@ -319,10 +319,25 @@ class BaseCommand extends Command {
   }
 
   /**
+   * Detect whether the CLI is configured for the Cloud Manager stage environment.
+   * Checks AIO_CLI_ENV env var and aio config 'cli.env' / 'ims.contexts.cli.env'.
+   * This does not require a token and works in batch mode.
+   */
+  isStageEnv() {
+    if (process.env.AIO_CLI_ENV === 'stage') return true;
+    const cliEnv = Config.get('cli.env');
+    if (cliEnv === 'stage') return true;
+    const imsEnv = Config.get('ims.contexts.cli.env');
+    if (imsEnv === 'stage') return true;
+    return false;
+  }
+
+  /**
    * Get the API base path for AEM Edge Functions (without the edge functions path suffix)
+   * @param {boolean} [stage=false] Whether to use the Cloud Manager stage domain suffix (-cmstg)
    * @returns {string|null} The computed base URL or null if configuration is incomplete
    */
-  getApiBasePath() {
+  getApiBasePath(stage = false) {
     if (process.env.AEM_EDGE_FUNCTIONS_API_ENDPOINT) {
       return process.env.AEM_EDGE_FUNCTIONS_API_ENDPOINT;
     }
@@ -338,27 +353,33 @@ class BaseCommand extends Command {
       return null;
     }
 
+    const stageSuffix = stage ? '-cmstg' : '';
     return isEdgeDelivery
       ? `https://${siteDomain}/adobe/experimental/compute-expires-20251231/cdn`
-      : `https://author-p${programId}-e${environmentId}.adobeaemcloud.com/adobe/experimental/compute-expires-20251231/cdn`;
+      : `https://author-p${programId}-e${environmentId}${stageSuffix}.adobeaemcloud.com/adobe/experimental/compute-expires-20251231/cdn`;
   }
 
   /**
    * Get the API endpoint for AEM Edge Functions
+   * @param {boolean} [stage=false] Whether to use the Cloud Manager stage domain suffix (-cmstg)
    * @returns {string|null} The computed API endpoint or null if configuration is incomplete
    */
-  getApiEndpoint() {
-    const basePath = this.getApiBasePath();
+  getApiEndpoint(stage = false) {
+    const basePath = this.getApiBasePath(stage);
     if (!basePath) return null;
 
     return basePath + (process.env.AEM_EDGE_FUNCTIONS_API_ENDPOINT_URL ?? '/edgeFunctions/fastly');
   }
 
-  async getFastlyCli() {
-    const apiEndpoint = this.getApiEndpoint();
-
-    // For edge function API requests, try to use ADC token if configured
+  /**
+   * Get an access token and detect whether the environment is stage.
+   * Tries (in order): AEM_EDGE_FUNCTIONS_TOKEN env var, ADC OAuth, IMS token.
+   * Stage is detected from IMS context data when available, falling back to isStageEnv().
+   * @returns {Promise<{accessToken: string|null, isStage: boolean}>}
+   */
+  async getAccessTokenAndStage() {
     let accessToken = process.env.AEM_EDGE_FUNCTIONS_TOKEN;
+    let isStage = this.isStageEnv();
 
     if (!accessToken) {
       const adcConfigured = this.getConfig(this.CONFIG_ADC_CONFIGURED);
@@ -370,18 +391,30 @@ class BaseCommand extends Command {
             accessToken = adcToken.accessToken;
           } else {
             ux.warn('Failed to get ADC token, falling back to IMS token');
-            accessToken = (await this.getTokenAndKey())?.accessToken;
+            const tokenResult = await this.getTokenAndKey();
+            accessToken = tokenResult?.accessToken;
+            isStage = tokenResult?.data?.env === 'stage' || isStage;
           }
         } catch (error) {
           ux.warn(`Failed to get ADC token: ${error.message}, falling back to IMS token`);
-          accessToken = (await this.getTokenAndKey())?.accessToken;
+          const tokenResult = await this.getTokenAndKey();
+          accessToken = tokenResult?.accessToken;
+          isStage = tokenResult?.data?.env === 'stage' || isStage;
         }
       } else {
         // No ADC configured, use IMS token
-        accessToken = (await this.getTokenAndKey())?.accessToken;
+        const tokenResult = await this.getTokenAndKey();
+        accessToken = tokenResult?.accessToken;
+        isStage = tokenResult?.data?.env === 'stage' || isStage;
       }
     }
 
+    return { accessToken, isStage };
+  }
+
+  async getFastlyCli() {
+    const { accessToken, isStage } = await this.getAccessTokenAndStage();
+    const apiEndpoint = this.getApiEndpoint(isStage);
     return new FastlyCli(accessToken, apiEndpoint);
   }
 }

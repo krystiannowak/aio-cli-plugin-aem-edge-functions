@@ -125,10 +125,16 @@ class FastlyCli {
     }
   }
 
-  async run(args, { filterOutput: shouldFilter = false } = {}) {
+  async run(args, { filterOutput: shouldFilter = false, debug = false } = {}) {
     if (!this.fastlyCliPath) {
       await this.init();
     }
+
+    // print API endpoint only in explicit debug mode
+    if (debug) {
+      console.log(`Using API endpoint: ${this.apiEndpoint}`);
+    }
+
     const env = {
       ...process.env,
       FASTLY_API_TOKEN: this.apiToken,
@@ -197,7 +203,10 @@ class FastlyCli {
   async deploy(serviceId, { debug = false } = {}) {
     this.ensureTokenIsSet();
     this.ensureServiceIdIsSafe(serviceId);
-    await this.run(['compute', 'deploy', '--service-id', serviceId], { filterOutput: !debug });
+    await this.run(['compute', 'deploy', '--service-id', serviceId], {
+      filterOutput: !debug,
+      debug
+    });
   }
 
   async serve({ watch = false } = {}) {
@@ -208,10 +217,10 @@ class FastlyCli {
     await this.run(args);
   }
 
-  async logTail(serviceId) {
+  async logTail(serviceId, { debug = false } = {}) {
     this.ensureTokenIsSet();
     this.ensureServiceIdIsSafe(serviceId);
-    await this.run(['log-tail', '--service-id', serviceId]);
+    await this.run(['log-tail', '--service-id', serviceId], { debug });
   }
 }
 

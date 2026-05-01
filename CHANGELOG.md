@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.8.1] - 2026-05-18
+
+### Added
+
+- `--debug` / `-d` flag for `tail-logs` and `purge-cache` commands to show API endpoint
+
+### Changed
+
+- API endpoint is now only shown when `--debug` flag is explicitly used
+
+### Fixed
+
+- Correct API endpoint resolution for non-production Cloud Manager environments
+
 ## [0.8.0] - 2026-05-15
 
 ### Added
