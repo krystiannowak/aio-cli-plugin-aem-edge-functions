@@ -1,7 +1,7 @@
 {
   "name": "@adobe/aio-cli-plugin-aem-edge-functions",
   "description": "Adobe I/O CLI plugin for interacting with AEM Edge Functions",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "author": "Adobe Inc.",
   "engines": {
     "npm": ">= 8.0.0",
@@ -28,7 +28,7 @@
     "eslint-plugin-prettier": "5.5.5",
     "husky": "8.0.3",
     "mocha": "12.0.0-beta-10",
-    "nyc": "15.1.0",
+    "nyc": "18.0.0",
     "prettier": "3.8.1",
     "sinon": "21.0.3"
   },
@@ -63,6 +63,9 @@
     "oclif-plugin"
   ],
   "license": "Apache-2.0",
+  "overrides": {
+    "uuid": "^14.0.0"
+  },
   "oclif": {
     "commands": "./src/commands",
     "bin": "aio",

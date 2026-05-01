@@ -205,6 +205,32 @@ The following command will tail your edge function logs to help you debug your a
 aio aem edge-functions tail-logs first-function
 ```
 
+## Purge cache
+
+Edge Function responses can be cached at the CDN layer. When cached content becomes stale due to inter-resource dependencies, you can explicitly purge it:
+
+```
+# Purge by surrogate key
+aio aem edge-functions purge-cache first-function --surrogateKey my-page-key
+
+# Purge multiple surrogate keys
+aio aem edge-functions purge-cache first-function -k key1 -k key2
+
+# Purge all cached content (use with caution)
+aio aem edge-functions purge-cache first-function --all
+
+# Soft purge (retain stale entries for revalidation)
+aio aem edge-functions purge-cache first-function -k my-key --soft
+```
+
+| Flag | Description |
+|------|-------------|
+| `--surrogateKey` / `-k` | Surrogate key to purge (can be specified multiple times) |
+| `--all` / `-a` | Purge all cached content for the edge function |
+| `--soft` / `-s` | Perform a soft purge (retain stale entries, reduce origin load) |
+
+Surrogate keys are set on Edge Function responses via the `Surrogate-Key` header. For more information on caching and purging, see the [AEM Edge Functions documentation](https://experienceleague.adobe.com/en/docs/experience-manager-cloud-service/content/implementing/developing/edge-functions).
+
 ## CI/CD Setup
 
 In a CI/CD pipeline you can avoid any interactive prompts by supplying all required values as environment variables and using the `--batch` / `-b` flag where applicable.

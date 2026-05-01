@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.0] - 2026-05-01
+
+### Added
+
+- `purge-cache` command to purge cached content for an Edge Function
+  - Purge by surrogate key (`--surrogateKey` / `-k`, supports multiple)
+  - Purge all cached content (`--all` / `-a`)
+  - Soft purge mode (`--soft` / `-s`)
+
+### Fixed
+
+- Resolved `uuid` audit vulnerability via npm overrides
+
 ## [0.7.0] - 2026-04-24
 
 ### Added
