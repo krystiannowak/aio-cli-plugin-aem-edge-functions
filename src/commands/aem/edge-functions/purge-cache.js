@@ -144,6 +144,11 @@ By default performs a hard purge (immediate removal). Use --soft for soft purge
         if (result?.id) {
           console.log(`  Purge ID: ${result.id}`);
         }
+        if (result?.items) {
+          for (const [key, id] of Object.entries(result.items)) {
+            console.log(`  ${key}: ${id}`);
+          }
+        }
       } else {
         let errorBody;
         try {

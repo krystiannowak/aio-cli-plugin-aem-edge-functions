@@ -223,11 +223,11 @@ aio aem edge-functions purge-cache first-function --all
 aio aem edge-functions purge-cache first-function -k my-key --soft
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--surrogateKey` / `-k` | Surrogate key to purge (can be specified multiple times) |
-| `--all` / `-a` | Purge all cached content for the edge function |
-| `--soft` / `-s` | Perform a soft purge (retain stale entries, reduce origin load) |
+| Flag                    | Description                                                     |
+| ----------------------- | --------------------------------------------------------------- |
+| `--surrogateKey` / `-k` | Surrogate key to purge (can be specified multiple times)        |
+| `--all` / `-a`          | Purge all cached content for the edge function                  |
+| `--soft` / `-s`         | Perform a soft purge (retain stale entries, reduce origin load) |
 
 Surrogate keys are set on Edge Function responses via the `Surrogate-Key` header. For more information on caching and purging, see the [AEM Edge Functions documentation](https://experienceleague.adobe.com/en/docs/experience-manager-cloud-service/content/implementing/developing/edge-functions).
 
