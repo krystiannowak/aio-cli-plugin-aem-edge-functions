@@ -156,7 +156,8 @@ By default performs a hard purge (immediate removal). Use --soft for soft purge
         } catch {
           errorBody = null;
         }
-        const errorMessage = errorBody?.error || `HTTP ${response.status} ${response.statusText}`;
+        const errorMessage =
+          errorBody?.detail || errorBody?.error || `HTTP ${response.status} ${response.statusText}`;
         const requestId = response.headers?.get('x-request-id');
         const requestIdInfo = requestId ? ` (request-id: ${requestId})` : '';
         this.error(`Cache purge failed: ${errorMessage}${requestIdInfo}`);
