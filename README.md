@@ -205,6 +205,14 @@ The following command will tail your edge function logs to help you debug your a
 aio aem edge-functions tail-logs first-function
 ```
 
+### Debug Mode
+
+To see the API endpoint used for log tailing (useful for troubleshooting connectivity issues), use the `--debug` / `-d` flag:
+
+```
+aio aem edge-functions tail-logs first-function --debug
+```
+
 ## Purge cache
 
 Edge Function responses can be cached at the CDN layer. When cached content becomes stale due to inter-resource dependencies, you can explicitly purge it:
@@ -228,6 +236,7 @@ aio aem edge-functions purge-cache first-function -k my-key --soft
 | `--surrogateKey` / `-k` | Surrogate key to purge (can be specified multiple times)        |
 | `--all` / `-a`          | Purge all cached content for the edge function                  |
 | `--soft` / `-s`         | Perform a soft purge (retain stale entries, reduce origin load) |
+| `--debug` / `-d`        | Show debug information including API endpoint                   |
 
 Surrogate keys are set on Edge Function responses via the `Surrogate-Key` header. For more information on caching and purging, see the [AEM Edge Functions documentation](https://experienceleague.adobe.com/en/docs/experience-manager-cloud-service/content/implementing/developing/edge-functions).
 

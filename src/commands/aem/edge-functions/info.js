@@ -56,12 +56,15 @@ class InfoCommand extends BaseCommand {
       let adcFetchFailed = false;
       let adcError = null;
 
+      let isStage = this.isStageEnv();
+
       // Fetch Cloud Manager data if we have orgId and programId
       if (orgId && programId && !this.flags.batch) {
         this.spinnerStart('Loading Cloud Manager program and environment names...');
         try {
           const { accessToken, apiKey, data } = await this.getTokenAndKey();
-          const cloudManagerUrl = this.getBaseUrl(data?.env === 'stage');
+          isStage = data?.env === 'stage';
+          const cloudManagerUrl = this.getBaseUrl(isStage);
           const cloudmanager = new Cloudmanager(
             `${cloudManagerUrl}/api`,
             apiKey,
@@ -191,11 +194,12 @@ class InfoCommand extends BaseCommand {
 
       // Display Cloud Manager URL
       if (orgId && programId) {
+        const experienceHost = isStage ? 'experience-stage.adobe.com' : 'experience.adobe.com';
         let cloudManagerUrl;
         if (edgeDelivery) {
-          cloudManagerUrl = `https://experience.adobe.com/#/@${orgId}/cloud-manager/edge-delivery.html/program/${programId}`;
+          cloudManagerUrl = `https://${experienceHost}/#/@${orgId}/cloud-manager/edge-delivery.html/program/${programId}`;
         } else if (environmentId) {
-          cloudManagerUrl = `https://experience.adobe.com/#/@${orgId}/cloud-manager/environments.html/program/${programId}/environment/${environmentId}`;
+          cloudManagerUrl = `https://${experienceHost}/#/@${orgId}/cloud-manager/environments.html/program/${programId}/environment/${environmentId}`;
         }
 
         if (cloudManagerUrl) {
@@ -223,7 +227,7 @@ class InfoCommand extends BaseCommand {
       if (this.flags.debug) {
         console.log(`\nTimestamp (UTC):         ${chalk.cyan(new Date().toISOString())}`);
 
-        const apiEndpoint = this.getApiBasePath() ? this.getApiBasePath() : null;
+        const apiEndpoint = this.getApiBasePath(isStage) ? this.getApiBasePath(isStage) : null;
         const adcClientId = this.getConfig(this.CONFIG_ADC_CLIENT_ID);
         const adcClientSecret = this.getConfig(this.CONFIG_ADC_CLIENT_SECRET);
         const adcScopes = this.getConfig(this.CONFIG_ADC_SCOPES);

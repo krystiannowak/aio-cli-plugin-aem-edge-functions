@@ -13,7 +13,7 @@
 'use strict';
 
 const BaseCommand = require('../../../libs/base-command');
-const { Args } = require('@oclif/core');
+const { Args, Flags } = require('@oclif/core');
 
 class TailLogsCommand extends BaseCommand {
   static description = 'Tail logs from your AEM edge function.';
@@ -23,10 +23,17 @@ class TailLogsCommand extends BaseCommand {
       required: true
     })
   };
+  static flags = {
+    debug: Flags.boolean({
+      char: 'd',
+      description: 'Show debug information including API endpoint',
+      default: false
+    })
+  };
 
   async run() {
     const fastly = await this.getFastlyCli();
-    await fastly.logTail(this.args.serviceId);
+    await fastly.logTail(this.args.serviceId, { debug: this.flags.debug });
   }
 }
 

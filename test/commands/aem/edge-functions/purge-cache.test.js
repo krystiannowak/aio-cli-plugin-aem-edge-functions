@@ -70,6 +70,9 @@ describe('PurgeCacheCommand', () => {
   it('should error when API endpoint is not configured', async () => {
     command.args = { serviceId: 'my-func' };
     command.flags = { all: true, soft: false };
+    command.getAccessTokenAndStage = sandbox
+      .stub()
+      .resolves({ accessToken: 'token', isStage: false });
     command.getApiBasePath = sandbox.stub().returns(null);
 
     await assert.rejects(() => command.run(), /command error/);

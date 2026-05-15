@@ -46,6 +46,11 @@ By default performs a hard purge (immediate removal). Use --soft for soft purge
       char: 's',
       description: 'Perform a soft purge (retain stale entries for revalidation)',
       default: false
+    }),
+    debug: Flags.boolean({
+      char: 'd',
+      description: 'Show debug information including API endpoint',
+      default: false
     })
   };
 
@@ -83,28 +88,20 @@ By default performs a hard purge (immediate removal). Use --soft for soft purge
       body.surrogateKeys = surrogateKey;
     }
 
-    // Get access token
-    const basePath = this.getApiBasePath();
+    // Get access token and detect stage
+    const { accessToken, isStage } = await this.getAccessTokenAndStage();
+
+    if (!accessToken) {
+      this.error('No access token available. Please authenticate first.');
+    }
+
+    const basePath = this.getApiBasePath(isStage);
     if (!basePath) {
       this.error('API endpoint not configured. Run "aio aem edge-functions setup" first.');
     }
 
-    let accessToken = process.env.AEM_EDGE_FUNCTIONS_TOKEN;
-    if (!accessToken) {
-      const adcConfigured = this.getConfig(this.CONFIG_ADC_CONFIGURED);
-      if (adcConfigured) {
-        const adcToken = await this.getAdcToken();
-        if (adcToken) {
-          accessToken = adcToken.accessToken;
-        }
-      }
-      if (!accessToken) {
-        accessToken = (await this.getTokenAndKey())?.accessToken;
-      }
-    }
-
-    if (!accessToken) {
-      this.error('No access token available. Please authenticate first.');
+    if (this.flags.debug) {
+      console.log(`Using API endpoint: ${basePath}`);
     }
 
     const request = new Request(basePath, {
