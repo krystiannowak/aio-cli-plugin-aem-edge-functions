@@ -215,7 +215,13 @@ aio aem edge-functions tail-logs first-function --debug
 
 ## Purge cache
 
-Edge Function responses can be cached at the CDN layer. When cached content becomes stale due to inter-resource dependencies, you can explicitly purge it:
+The `purge-cache` command purges the **Edge Function's internal cache** — it clears cached origin responses from `fetch()` calls and any data stored via the Core Cache API within your Edge Function. It does **not** purge the outer AEM CDN cache (for that, use the [CDN Cache Purge API](https://experienceleague.adobe.com/en/docs/experience-manager-cloud-service/content/implementing/content-delivery/cdn-cache-purge)).
+
+```
+Browser → AEM CDN (CDN Cache) → AEM Edge Functions (Fetch Cache + Core Cache) → Origin
+                                       ↑
+                            purge-cache targets this layer
+```
 
 ```
 # Purge by surrogate key
@@ -238,7 +244,13 @@ aio aem edge-functions purge-cache first-function -k my-key --soft
 | `--soft` / `-s`         | Perform a soft purge (retain stale entries, reduce origin load) |
 | `--debug` / `-d`        | Show debug information including API endpoint                   |
 
-Surrogate keys are set on Edge Function responses via the `Surrogate-Key` header. For more information on caching and purging, see the [AEM Edge Functions documentation](https://experienceleague.adobe.com/en/docs/experience-manager-cloud-service/content/implementing/developing/edge-functions).
+**What gets purged:**
+- **Fetch cache entries** — origin responses cached when your Edge Function calls `fetch()`. Surrogate keys for these come from the origin's `Surrogate-Key` response header.
+- **Core Cache API entries** — arbitrary data stored via the Core Cache or Simple Cache APIs. Surrogate keys for these are assigned programmatically when writing to the cache.
+
+> **Note:** The `Surrogate-Key` header you set on your Edge Function's *outgoing* response to the browser controls the *outer CDN cache* (purged via the CDN Cache Purge API), not the inner fetch cache targeted by this command.
+
+For more information on caching and purging, see the [AEM Edge Functions documentation](https://experienceleague.adobe.com/en/docs/experience-manager-cloud-service/content/implementing/developing/edge-functions).
 
 ## CI/CD Setup
 
