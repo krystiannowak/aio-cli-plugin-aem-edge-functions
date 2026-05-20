@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.0] - 2026-05-20
+
+### Added
+
+- `list` command to list all Edge Functions configured for the current environment
+  - Displays a formatted table with name, active package ID, creation and update timestamps
+  - `--debug` / `-d` flag to show API endpoint URL
+
 ## [0.8.1] - 2026-05-15
 
 ### Added

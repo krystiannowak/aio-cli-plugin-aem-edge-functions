@@ -155,6 +155,30 @@ aio aem edge-functions info --batch
 
 In batch mode, any step that requires an interactive login is skipped. This is useful in CI/CD pipelines or scripted environments where interactive login is not possible. Cloud Manager program/environment names and ADC project/workspace names will not be shown. API connectivity is still tested if a token is available via environment variable or ADC OAuth credentials.
 
+## List
+
+List all Edge Functions configured for the current environment:
+
+```
+aio aem edge-functions list
+```
+
+This displays a table of all available Edge Functions with their name, creation and last update timestamps, and active package ID:
+
+```
+NAME              CREATED                UPDATED                ACTIVE_PACKAGE
+abc-edgefunc      2026-02-10 09:31:47    2026-05-12 14:41:00    49
+xyz-edgefunc      2026-02-10 09:32:13    2026-02-10 09:32:13    -
+```
+
+### Debug Mode
+
+To see the API endpoint used (useful for troubleshooting connectivity issues), use the `--debug` / `-d` flag:
+
+```
+aio aem edge-functions list --debug
+```
+
 ## Build
 
 The following command will package your code for deployment to your edge function.
@@ -245,10 +269,11 @@ aio aem edge-functions purge-cache first-function -k my-key --soft
 | `--debug` / `-d`        | Show debug information including API endpoint                   |
 
 **What gets purged:**
+
 - **Fetch cache entries** — origin responses cached when your Edge Function calls `fetch()`. Surrogate keys for these come from the origin's `Surrogate-Key` response header.
 - **Core Cache API entries** — arbitrary data stored via the Core Cache or Simple Cache APIs. Surrogate keys for these are assigned programmatically when writing to the cache.
 
-> **Note:** The `Surrogate-Key` header you set on your Edge Function's *outgoing* response to the browser controls the *outer CDN cache* (purged via the CDN Cache Purge API), not the inner fetch cache targeted by this command.
+> **Note:** The `Surrogate-Key` header you set on your Edge Function's _outgoing_ response to the browser controls the _outer CDN cache_ (purged via the CDN Cache Purge API), not the inner fetch cache targeted by this command.
 
 For more information on caching and purging, see the [AEM Edge Functions documentation](https://experienceleague.adobe.com/en/docs/experience-manager-cloud-service/content/implementing/developing/edge-functions).
 
