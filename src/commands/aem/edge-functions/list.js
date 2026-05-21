@@ -68,7 +68,9 @@ class ListCommand extends BaseCommand {
           result = null;
         }
 
-        const items = result?.items || [];
+        const items = (result?.items || []).sort((a, b) =>
+          (a.edgeFunctionName || '').localeCompare(b.edgeFunctionName || '')
+        );
 
         if (items.length === 0) {
           console.log(chalk.yellow('No Edge Functions found for this environment.'));
