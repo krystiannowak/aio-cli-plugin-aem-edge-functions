@@ -55,12 +55,16 @@ class HelpCommand extends BaseCommand {
     console.log(chalk.dim('     Serve your function locally and watch for file changes'));
     console.log(cmd$('aio aem edge-functions serve --watch'));
 
-    console.log(`\n  ${chalk.bold('3. Build and deploy')}`);
+    console.log(`\n  ${chalk.bold('3. List configured functions')}`);
+    console.log(chalk.dim('     Show all Edge Functions available in your environment'));
+    console.log(cmd$('aio aem edge-functions list'));
+
+    console.log(`\n  ${chalk.bold('4. Build and deploy')}`);
     console.log(chalk.dim('     Package your code and push it to a named edge function'));
     console.log(cmd$('aio aem edge-functions build'));
     console.log(cmd$('aio aem edge-functions deploy my-function'));
 
-    console.log(`\n  ${chalk.bold('4. Remote debugging')}`);
+    console.log(`\n  ${chalk.bold('5. Remote debugging')}`);
     console.log(chalk.dim('     Stream live logs from a deployed edge function'));
     console.log(cmd$('aio aem edge-functions tail-logs my-function'));
 
