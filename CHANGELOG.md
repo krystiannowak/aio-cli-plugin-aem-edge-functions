@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.11.0] - 2026-06-24
+
+### Added
+
+- Public beta notice with interactive acknowledgement on every command (`--accept-beta` flag for CI/CD)
+
 ## [0.10.1] - 2026-06-24
 
 ### Changed

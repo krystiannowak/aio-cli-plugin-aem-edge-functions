@@ -15,12 +15,28 @@
 const ora = require('ora-classic');
 const jwt = require('jsonwebtoken');
 const chalk = require('chalk');
+const { confirm } = require('@inquirer/prompts');
 const { context, getToken } = require('@adobe/aio-lib-ims');
 const { Command } = require('@oclif/core');
 const { ux } = require('@oclif/core');
 const Config = require('@adobe/aio-lib-core-config');
 const FastlyCli = require('./fastly-cli');
 const { createFetch } = require('@adobe/aio-lib-core-networking');
+
+const BETA_NOTICE = `
+================================================================================
+  AEM Edge Functions — Public Beta
+
+  AEM Edge Functions is currently in public beta. It is primarily intended
+  for development and experimentation purposes.
+
+  Do not use in production without prior discussion with your Adobe
+  representative. You can email aemcs-edgecompute-feedback@adobe.com.
+
+  By continuing, you acknowledge that this feature is provided as-is,
+  may change without notice, and is not covered by production SLAs.
+================================================================================
+`;
 
 let spinner;
 
@@ -78,7 +94,8 @@ function parseAdcConfigEnv() {
 const BOOLEAN_CONFIGS = new Set([
   'edgefunctions_edge_delivery',
   'cloudmanager_edge_delivery',
-  'edgefunctions_adc_configured'
+  'edgefunctions_adc_configured',
+  'edgefunctions_beta_agreed'
 ]);
 
 function parseBool(value) {
@@ -90,6 +107,7 @@ function parseBool(value) {
 }
 
 class BaseCommand extends Command {
+  CONFIG_BETA_AGREED = 'edgefunctions_beta_agreed';
   CONFIG_ORG = 'cloudmanager_orgid';
   CONFIG_PROGRAM = 'cloudmanager_programid';
   CONFIG_ENVIRONMENT = 'cloudmanager_environmentid';
@@ -178,6 +196,11 @@ class BaseCommand extends Command {
   }
 
   async init() {
+    // Strip --accept-beta from argv before oclif parses, so it doesn't reject
+    // it as an unknown flag. We check it via process.argv in showBetaNotice().
+    this._acceptBeta = process.argv.includes('--accept-beta');
+    this.argv = this.argv.filter((a) => a !== '--accept-beta');
+
     await super.init();
     const { args, flags } = await this.parse({
       flags: this.ctor.flags,
@@ -187,6 +210,33 @@ class BaseCommand extends Command {
     });
     this.flags = flags;
     this.args = args;
+
+    await this.showBetaNotice();
+  }
+
+  async showBetaNotice() {
+    // Always display the beta notice — even when already agreed or in batch/CI mode,
+    // so it remains visible in logs for retroactive review.
+    console.log(chalk.yellow(BETA_NOTICE));
+
+    // Skip the interactive prompt if already acknowledged.
+    // --accept-beta is stripped from argv in init() and stored in this._acceptBeta,
+    // so oclif doesn't reject it as an unknown flag on commands that don't define it.
+    const alreadyAgreed = parseBool(Config.get(this.CONFIG_BETA_AGREED));
+    if (alreadyAgreed || this._acceptBeta || this.flags?.batch) {
+      return;
+    }
+
+    const agreed = await confirm({
+      message: 'Do you acknowledge the public beta notice above and wish to continue?',
+      default: false
+    });
+
+    if (!agreed) {
+      this.error('You must acknowledge the public beta notice to use AEM Edge Functions.');
+    }
+
+    Config.set(this.CONFIG_BETA_AGREED, true, true);
   }
 
   /**
