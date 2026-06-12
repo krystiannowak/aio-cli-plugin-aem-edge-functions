@@ -16,7 +16,7 @@ const { filterOutput, shouldFilterLine } = require('../../src/libs/fastly-cli');
 
 describe('FastlyCli', function () {
   describe('#filterOutput', function () {
-    it('should remove "Manage this service at" and "View this service at" blocks', function () {
+    it('should remove "Manage this service at" but keep "View this service at" with warning', function () {
       const input = [
         '✓ Activating service (version 29)',
         '',
@@ -24,31 +24,53 @@ describe('FastlyCli', function () {
         '\thttps://manage.fastly.com/configure/services/abc-edgefunc',
         '',
         'View this service at:',
-        '\thttps://compute-backend-p42913-e1920257-abc-edgefunc.adobeaemcloud.com',
+        '\thttps://edgefunction-p42913-e1920257-abc-edgefunc.adobeaemcloud.com',
         '',
         'SUCCESS: Deployed package (service abc-edgefunc, version 29)'
       ].join('\n');
       const result = filterOutput(input);
       assert.ok(!result.includes('manage.fastly.com'));
       assert.ok(!result.includes('Manage this service at'));
-      assert.ok(!result.includes('View this service at'));
-      assert.ok(!result.includes('adobeaemcloud.com'));
+      assert.ok(result.includes('View this service at'));
+      assert.ok(result.includes('adobeaemcloud.com'));
+      assert.ok(result.includes('only for debugging'));
       assert.ok(result.includes('SUCCESS'));
     });
 
-    it('should remove Fastly CLI upgrade notice', function () {
+    it('should inject warning after "View this service at" URL', function () {
+      const input = [
+        'View this service at:',
+        '\thttps://edgefunction-p42913-e1920257-my-func.adobeaemcloud.com',
+        '',
+        'SUCCESS: Deployed package (service my-func, version 5)'
+      ].join('\n');
+      const result = filterOutput(input);
+      const urlIndex = result.indexOf('adobeaemcloud.com');
+      const warningIndex = result.indexOf('only for debugging');
+      const successIndex = result.indexOf('SUCCESS');
+      assert.ok(urlIndex > -1, 'URL should be present');
+      assert.ok(warningIndex > urlIndex, 'warning should appear after URL');
+      assert.ok(successIndex > warningIndex, 'SUCCESS should appear after warning');
+    });
+
+    it('should remove Fastly CLI upgrade notice and release notes', function () {
       const input = [
         'SUCCESS: Deployed package (service abc-edgefunc, version 29)',
         '',
         'A new version of the Fastly CLI is available.',
         'Current version: 13.3.0',
         'Latest version: 14.3.1',
+        '',
+        'Note: Please review the release notes for the major version(s) listed below before upgrading.',
+        'Version 15.0.0: https://github.com/fastly/cli/releases/tag/v15.0.0',
         'Run `fastly update` to get the latest version.'
       ].join('\n');
       const result = filterOutput(input);
       assert.ok(!result.includes('new version of the Fastly CLI'));
       assert.ok(!result.includes('Current version'));
       assert.ok(!result.includes('fastly update'));
+      assert.ok(!result.includes('Please review the release notes'));
+      assert.ok(!result.includes('Version 15.0.0'));
       assert.ok(result.includes('SUCCESS'));
     });
 
