@@ -21,17 +21,23 @@ const OUTPUT_FILTERS = [
   // "Manage this service at:" block with the manage.fastly.com URL
   /^Manage this service at:$/,
   /^\thttps:\/\/manage\.fastly\.com\//,
-  // "View this service at:" block with internal compute backend URL
-  /^View this service at:$/,
-  /^\thttps:\/\/.*\.adobeaemcloud\.com/,
   // "A new version of the Fastly CLI is available" upgrade notice
   /^A new version of the Fastly CLI is available/,
   /^Current version:/,
   /^Latest version:/,
   /^Run `fastly update`/,
+  // Release notes / upgrade review notice
+  /^Note: Please review the release notes/,
+  /^Version \d+\.\d+\.\d+:/,
   // Fastly CLI bug report prompt
   /^If you believe this error is the result of a bug, please file an issue:/
 ];
+
+const VIEW_SERVICE_URL_RE = /^\thttps:\/\/.*\.adobeaemcloud\.com/;
+const VIEW_SERVICE_WARNING =
+  '\nWarning: this url is only for debugging, do not use it in production as it can change at any time.\n';
+const VIEW_SERVICE_WARNING_DEBUG =
+  '\nWarning: the direct edge function url is only for debugging, do not use it in production as it can change at any time.\n';
 
 // eslint-disable-next-line no-control-regex
 const ANSI_RE = /\x1b\[[0-9;]*m/g;
@@ -83,6 +89,9 @@ function filterOutput(data) {
       continue;
     }
     result.push(colorize(line));
+    if (VIEW_SERVICE_URL_RE.test(stripAnsi(line))) {
+      result.push(colorize(VIEW_SERVICE_WARNING));
+    }
   }
   return result.join('\n');
 }
@@ -143,16 +152,17 @@ class FastlyCli {
 
     if (!shouldFilter) {
       execFileSync(this.fastlyCliPath, args, { stdio: 'inherit', env });
-      return;
+      return '';
     }
 
-    // We need to pipe stdout to filter out unwanted lines, but this means
-    // the child process loses TTY detection (no colors, no live spinners).
-    // To compensate we:
-    //   - Show our own spinner while the command runs (using ora-classic)
-    //   - Re-apply green coloring to ✓ and SUCCESS lines after filtering
-    const ora = require('ora-classic');
-    const spinner = ora({ text: 'Deploying...', color: 'cyan' }).start();
+    // Pipe stdout/stderr to filter or capture the output. This means the
+    // child process loses TTY detection (no colors, no live spinners).
+    // When filtering, we compensate with our own spinner + re-colorization.
+    let spinner;
+    if (shouldFilter) {
+      const ora = require('ora-classic');
+      spinner = ora({ text: 'Deploying...', color: 'cyan' }).start();
+    }
 
     return new Promise((resolve, reject) => {
       const child = spawn(this.fastlyCliPath, args, {
@@ -167,30 +177,30 @@ class FastlyCli {
       child.stderr.on('data', (chunk) => stderrChunks.push(chunk.toString()));
 
       child.on('close', (code) => {
-        spinner.stop();
+        if (spinner) spinner.stop();
 
         const stdout = stdoutChunks.join('');
         const stderr = stderrChunks.join('');
 
         if (stdout) {
-          process.stdout.write(filterOutput(stdout));
+          process.stdout.write(shouldFilter ? filterOutput(stdout) : stdout);
         }
         if (stderr) {
-          const filtered = filterOutput(stderr);
-          if (filtered.trim()) {
-            process.stderr.write(filtered);
+          const out = shouldFilter ? filterOutput(stderr) : stderr;
+          if (out.trim()) {
+            process.stderr.write(out);
           }
         }
 
         if (code !== 0) {
           reject(new Error(`Fastly CLI exited with code ${code}`));
         } else {
-          resolve();
+          resolve(stdout);
         }
       });
 
       child.on('error', (err) => {
-        spinner.stop();
+        if (spinner) spinner.stop();
         reject(err);
       });
     });
@@ -207,6 +217,9 @@ class FastlyCli {
       filterOutput: !debug,
       debug
     });
+    if (debug) {
+      console.log(VIEW_SERVICE_WARNING_DEBUG);
+    }
   }
 
   async serve({ watch = false } = {}) {

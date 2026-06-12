@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1] - 2026-06-12
+
+### Changed
+
+- Deploy command now shows the Edge Function URL with a debugging-only warning
+- Extended filtering of unnecessary internal details from deployment output
+
 ## [0.9.0] - 2026-05-22
 
 ### Added
