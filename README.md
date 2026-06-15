@@ -197,9 +197,27 @@ To be able to deploy, you need to have the "AEM Administrator" product profile f
 aio aem edge-functions deploy first-function
 ```
 
+### Skip unchanged packages
+
+The deploy command computes a hash of the package contents and compares it to the hash of the currently active package. If they match, the deploy is skipped and no upload is performed.
+
+To force a re-deploy even when the package has not changed, use the `--force` / `-f` flag:
+
+```
+aio aem edge-functions deploy first-function --force
+```
+
+### Specifying a package file
+
+By default, the deploy command looks for a `.tar.gz` file in the `pkg/` directory (produced by the build command). To deploy a specific package file instead, use the `--package` / `-p` flag:
+
+```
+aio aem edge-functions deploy first-function --package path/to/my-package.tar.gz
+```
+
 ### Debug Mode
 
-To see the raw, unfiltered output from the underlying CLI (useful for troubleshooting deployment issues), use the `--debug` / `-d` flag:
+To see detailed information about the deployment process (endpoint URL, package hash, hash comparison result), use the `--debug` / `-d` flag:
 
 ```
 aio aem edge-functions deploy first-function --debug
