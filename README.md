@@ -223,6 +223,29 @@ To see detailed information about the deployment process (endpoint URL, package 
 aio aem edge-functions deploy first-function --debug
 ```
 
+## List packages
+
+The following command lists all deployed packages for an edge function, newest first. The active package is highlighted.
+
+```
+aio aem edge-functions packages first-function
+```
+
+Use `--limit` / `-l` to control how many packages are returned, and `--cursor` / `-c` to fetch the next page when a cursor is shown at the bottom of the output:
+
+```
+aio aem edge-functions packages first-function --limit 5
+aio aem edge-functions packages first-function --cursor <cursor>
+```
+
+## Get package details
+
+The following command shows the full details of a specific package, including its size, deployment date, and content hash:
+
+```
+aio aem edge-functions package first-function 42
+```
+
 ## Local run
 
 The following command will run your edge function code locally and exposed a server at `http://127.0.0.1:7676`
