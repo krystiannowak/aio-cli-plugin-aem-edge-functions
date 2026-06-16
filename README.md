@@ -144,6 +144,7 @@ In debug mode, the command additionally displays:
 - All active `AEM_EDGE_FUNCTIONS_*` environment variables
 - Edge Functions API endpoint
 - API connectivity test with token type and HTTP status
+- Table of deployed Edge Functions with their debug domain URLs (Warning: The debug URL is only for debugging, do not use it in production as it can change at any time.)
 
 ### Batch Mode
 
@@ -213,6 +214,17 @@ By default, the deploy command looks for a `.tar.gz` file in the `pkg/` director
 
 ```
 aio aem edge-functions deploy first-function --package path/to/my-package.tar.gz
+```
+
+### Debug URL
+
+After a successful deployment, the command prints the debug URL for your Edge Function:
+
+```
+View this edge function at:
+    https://edgefunction-p1234-e567890-first-function.adobeaemcloud.com
+
+Warning: This URL is only for debugging, do not use it in production as it can change at any time.
 ```
 
 ### Debug Mode

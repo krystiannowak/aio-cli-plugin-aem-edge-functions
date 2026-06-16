@@ -52,7 +52,8 @@ describe('DeployCommand', () => {
 
     // Default: hash check says "changed" so upload always proceeds
     command.computePackageHash = sandbox.stub().returns('local-hash-abc');
-    command.isUpToDate = sandbox.stub().resolves(false);
+    command.fetchEdgeFunction = sandbox.stub().resolves(null);
+    command.isUpToDate = sandbox.stub().returns(false);
   });
 
   afterEach(() => {
@@ -95,7 +96,7 @@ describe('DeployCommand', () => {
 
   describe('hash check', () => {
     it('skips upload and prints up-to-date when hashes match', async () => {
-      command.isUpToDate.resolves(true);
+      command.isUpToDate.returns(true);
 
       const logged = [];
       const origLog = console.log;
@@ -111,7 +112,6 @@ describe('DeployCommand', () => {
     });
 
     it('proceeds with upload when hashes differ', async () => {
-      command.isUpToDate.resolves(false);
       mockFetch.resolves({
         ok: true,
         json: async () => ({ id: '5', name: 'my-function', size: 1024 })
@@ -122,8 +122,7 @@ describe('DeployCommand', () => {
       assert.ok(mockFetch.calledOnce, 'should POST');
     });
 
-    it('proceeds with upload when hash check fails', async () => {
-      command.isUpToDate.resolves(false);
+    it('proceeds with upload when fetchEdgeFunction returns null', async () => {
       mockFetch.resolves({
         ok: true,
         json: async () => ({ id: '6', name: 'my-function', size: 1024 })
@@ -134,9 +133,11 @@ describe('DeployCommand', () => {
       assert.ok(mockFetch.calledOnce);
     });
 
-    it('passes the local hash to isUpToDate', async () => {
+    it('passes fetched data and local hash to isUpToDate', async () => {
+      const efData = { activePackage: { filesHash: 'remote-hash' } };
       command.computePackageHash.returns('deadbeef');
-      command.isUpToDate.resolves(true);
+      command.fetchEdgeFunction.resolves(efData);
+      command.isUpToDate.returns(true);
 
       const origLog = console.log;
       console.log = () => {};
@@ -146,14 +147,7 @@ describe('DeployCommand', () => {
         console.log = origLog;
       }
 
-      assert.ok(
-        command.isUpToDate.calledWith(
-          'my-function',
-          sinon.match.string,
-          sinon.match.string,
-          'deadbeef'
-        )
-      );
+      assert.ok(command.isUpToDate.calledWith(efData, 'deadbeef'));
     });
   });
 
@@ -376,6 +370,129 @@ describe('DeployCommand', () => {
         logged.some((msg) => msg.includes('deadbeef-local-hash')),
         'should log local hash'
       );
+    });
+  });
+
+  describe('fetchEdgeFunction', () => {
+    beforeEach(() => {
+      command.fetchEdgeFunction = DeployCommand.prototype.fetchEdgeFunction.bind(command);
+    });
+
+    it('returns the full EdgeFunction object', async () => {
+      const efData = {
+        name: 'my-fn',
+        debugDomain: 'edgefunction-p1234-e567890-my-fn.adobeaemcloud.com'
+      };
+      mockFetch.resolves({ ok: true, json: async () => efData });
+
+      const result = await command.fetchEdgeFunction('my-fn', 'https://example.com/cdn', 'tok');
+      assert.deepStrictEqual(result, efData);
+    });
+
+    it('calls GET /edgeFunctions/{name}', async () => {
+      mockFetch.resolves({ ok: true, json: async () => ({}) });
+
+      await command.fetchEdgeFunction('my-fn', 'https://example.com/cdn', 'test-token');
+
+      const [url] = mockFetch.firstCall.args;
+      assert.strictEqual(url, 'https://example.com/cdn/edgeFunctions/my-fn');
+    });
+
+    it('returns null when the response is not ok', async () => {
+      mockFetch.resolves({ ok: false, status: 404 });
+      const result = await command.fetchEdgeFunction('my-fn', 'https://example.com/cdn', 'tok');
+      assert.strictEqual(result, null);
+    });
+
+    it('returns null on fetch error', async () => {
+      mockFetch.rejects(new Error('network error'));
+      const result = await command.fetchEdgeFunction('my-fn', 'https://example.com/cdn', 'tok');
+      assert.strictEqual(result, null);
+    });
+  });
+
+  describe('isUpToDate', () => {
+    it('returns true when filesHash matches localHash', () => {
+      const efData = { activePackage: { id: '1', filesHash: 'abc123' } };
+      assert.strictEqual(DeployCommand.prototype.isUpToDate(efData, 'abc123'), true);
+    });
+
+    it('returns false when filesHash differs', () => {
+      const efData = { activePackage: { id: '1', filesHash: 'abc123' } };
+      assert.strictEqual(DeployCommand.prototype.isUpToDate(efData, 'different'), false);
+    });
+
+    it('returns false when activePackage is absent', () => {
+      assert.strictEqual(DeployCommand.prototype.isUpToDate({ name: 'fn' }, 'abc123'), false);
+    });
+
+    it('returns false when efData is null', () => {
+      assert.strictEqual(DeployCommand.prototype.isUpToDate(null, 'abc123'), false);
+    });
+  });
+
+  describe('service URL output', () => {
+    const DEBUG_DOMAIN = 'edgefunction-p1234-e567890-my-function.adobeaemcloud.com';
+
+    it('shows debug domain from fetchEdgeFunction on normal deploy', async () => {
+      command.fetchEdgeFunction.resolves({ debugDomain: DEBUG_DOMAIN });
+      mockFetch.resolves({
+        ok: true,
+        json: async () => ({ id: '1', name: 'my-function', size: 1024 })
+      });
+
+      const logged = [];
+      const origLog = console.log;
+      console.log = (...args) => logged.push(args.join(' '));
+      try {
+        await command.run();
+      } finally {
+        console.log = origLog;
+      }
+
+      const output = logged.join('\n');
+      assert.ok(output.includes(`https://${DEBUG_DOMAIN}`));
+      assert.ok(output.includes('only for debugging'));
+      assert.ok(command.fetchEdgeFunction.calledOnce, 'should call fetchEdgeFunction once');
+    });
+
+    it('fetches debug domain via fetchEdgeFunction on --force deploy', async () => {
+      command.flags.force = true;
+      command.fetchEdgeFunction.resolves({ debugDomain: DEBUG_DOMAIN });
+      mockFetch.resolves({
+        ok: true,
+        json: async () => ({ id: '1', name: 'my-function', size: 1024 })
+      });
+
+      const logged = [];
+      const origLog = console.log;
+      console.log = (...args) => logged.push(args.join(' '));
+      try {
+        await command.run();
+      } finally {
+        console.log = origLog;
+      }
+
+      assert.ok(command.fetchEdgeFunction.calledOnce, 'should call fetchEdgeFunction on --force');
+      assert.ok(logged.join('\n').includes(`https://${DEBUG_DOMAIN}`));
+    });
+
+    it('skips the URL block when no debug domain is available', async () => {
+      mockFetch.resolves({
+        ok: true,
+        json: async () => ({ id: '1', name: 'my-function', size: 1024 })
+      });
+
+      const logged = [];
+      const origLog = console.log;
+      console.log = (...args) => logged.push(args.join(' '));
+      try {
+        await command.run();
+      } finally {
+        console.log = origLog;
+      }
+
+      assert.ok(!logged.some((msg) => msg.includes('View this service at')));
     });
   });
 });

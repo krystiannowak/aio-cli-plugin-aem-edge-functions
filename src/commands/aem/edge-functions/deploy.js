@@ -111,19 +111,16 @@ class DeployCommand extends BaseCommand {
       console.log(`  Endpoint: ${url}\n`);
     }
 
+    let debugDomain = null;
+
     if (!this.flags.force) {
       const localHash = this.computePackageHash(packageFile, this.flags.debug);
       if (this.flags.debug) {
         console.log(`  Local hash:  ${localHash}\n`);
       }
-      const upToDate = await this.isUpToDate(
-        edgeFunctionName,
-        basePath,
-        accessToken,
-        localHash,
-        this.flags.debug
-      );
-      if (upToDate) {
+      const efData = await this.fetchEdgeFunction(edgeFunctionName, basePath, accessToken);
+      debugDomain = efData?.debugDomain ?? null;
+      if (this.isUpToDate(efData, localHash, this.flags.debug)) {
         console.log(
           `${chalk.green('✓')} Already up to date — use ${chalk.bold('--force')} to redeploy.`
         );
@@ -174,6 +171,33 @@ class DeployCommand extends BaseCommand {
     if (result.size != null) meta.push(`${(result.size / 1024).toFixed(1)} KB`);
     if (result.createdAt) meta.push(`activated ${new Date(result.createdAt).toLocaleString()}`);
     console.log(chalk.dim(`  ${meta.join(' · ')}`));
+
+    if (this.flags.force) {
+      const efData = await this.fetchEdgeFunction(edgeFunctionName, basePath, accessToken);
+      debugDomain = efData?.debugDomain ?? null;
+    }
+
+    if (debugDomain) {
+      console.log(`\nView this edge function at:\n    ${chalk.cyan(`https://${debugDomain}`)}`);
+      console.log(
+        chalk.yellow(
+          '\nWarning: This URL is only for debugging, do not use it in production as it can change at any time.'
+        )
+      );
+    }
+  }
+
+  async fetchEdgeFunction(edgeFunctionName, basePath, accessToken) {
+    try {
+      const fetch = networking.createFetch();
+      const res = await fetch(`${basePath}/edgeFunctions/${edgeFunctionName}`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -217,38 +241,19 @@ class DeployCommand extends BaseCommand {
     return hash.digest('hex');
   }
 
-  /**
-   * Returns true when the active package on the server has the same hash as localHash,
-   * meaning a re-upload would have no effect. Returns false on any error so that
-   * the deploy proceeds rather than being silently skipped.
-   */
-  async isUpToDate(edgeFunctionName, basePath, accessToken, localHash, debug = false) {
-    try {
-      const fetch = networking.createFetch();
-      const efRes = await fetch(`${basePath}/edgeFunctions/${edgeFunctionName}`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      if (!efRes.ok) {
-        if (debug)
-          console.log(
-            `  Hash check: GET edgeFunction returned ${efRes.status} — proceeding with upload`
-          );
-        return false;
-      }
-
-      const efBody = await efRes.json();
-      const { activePackage } = efBody;
-      const filesHash = activePackage?.filesHash;
-      if (debug) {
-        console.log(`  Hash check: activePackage.id = ${activePackage?.id ?? '(none)'}`);
-        console.log(`  Remote hash: ${filesHash ?? '(none)'}`);
-        console.log(`  Match: ${filesHash === localHash}`);
-      }
-      return filesHash != null && filesHash === localHash;
-    } catch (err) {
-      if (debug) console.log(`  Hash check failed: ${err.message} — proceeding with upload`);
+  isUpToDate(efData, localHash, debug = false) {
+    if (!efData) {
+      if (debug) console.log('  Hash check: no edge function data — proceeding with upload');
       return false;
     }
+    const { activePackage } = efData;
+    const filesHash = activePackage?.filesHash;
+    if (debug) {
+      console.log(`  Hash check: activePackage.id = ${activePackage?.id ?? '(none)'}`);
+      console.log(`  Remote hash: ${filesHash ?? '(none)'}`);
+      console.log(`  Match: ${filesHash === localHash}`);
+    }
+    return filesHash != null && filesHash === localHash;
   }
 }
 

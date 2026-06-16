@@ -365,6 +365,65 @@ class InfoCommand extends BaseCommand {
                     );
                   }
                 }
+                // List edge functions with their debug domains
+                try {
+                  this.spinnerStart('Loading Edge Functions...');
+                  const efListRes = await fetch(`${apiEndpoint}/edgeFunctions`, {
+                    method: 'GET',
+                    headers: { Authorization: `Bearer ${accessToken}` }
+                  });
+                  if (efListRes.ok) {
+                    const efListBody = await efListRes.json();
+                    const functions = efListBody?.items || [];
+                    const rows = [];
+                    for (const ef of functions) {
+                      const name = ef.name || ef.edgeFunctionName || '?';
+                      let debugDomain = '-';
+                      let error = false;
+                      try {
+                        const efRes = await fetch(`${apiEndpoint}/edgeFunctions/${name}`, {
+                          method: 'GET',
+                          headers: { Authorization: `Bearer ${accessToken}` }
+                        });
+                        if (efRes.ok) {
+                          const efBody = await efRes.json();
+                          debugDomain = efBody.debugDomain ? `https://${efBody.debugDomain}` : '-';
+                        } else {
+                          error = true;
+                        }
+                      } catch {
+                        error = true;
+                      }
+                      rows.push({ name, debugDomain, error });
+                    }
+                    this.spinnerStop();
+
+                    if (rows.length > 0) {
+                      console.log(chalk.bold('\nEdge Functions:'));
+                      const nameWidth = Math.max('NAME'.length, ...rows.map((r) => r.name.length));
+                      const domainWidth = Math.max(
+                        'DEBUG URL (Warning: May change at any time)'.length,
+                        ...rows.map((r) => r.debugDomain.length)
+                      );
+                      console.log(
+                        chalk.bold(
+                          `  ${'NAME'.padEnd(nameWidth)}    ${'DEBUG URL (Warning: May change at any time)'.padEnd(domainWidth)}`
+                        )
+                      );
+                      for (const { name, debugDomain, error } of rows) {
+                        const domainCell = error
+                          ? chalk.red('error fetching details')
+                          : chalk.cyan(debugDomain);
+                        console.log(`  ${chalk.green(name.padEnd(nameWidth))}    ${domainCell}`);
+                      }
+                    }
+                  } else {
+                    this.spinnerStop();
+                  }
+                } catch {
+                  this.spinnerStop();
+                  // ignore — edge functions list is supplemental
+                }
               } else if (response.status === 401 || response.status === 403) {
                 console.log(
                   `API Status:             ${chalk.red('✗ Authentication failed')} (HTTP ${response.status})`
