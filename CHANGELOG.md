@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.10.0] - 2026-06-16
+
+### Added
+
+- `deploy` command now uploads directly to the CDN API instead of using the Fastly CLI proxy
+  - Skips upload when the local package hash matches the active package
+  - `--force` / `-f` flag to force re-deploy even when the package has not changed
+  - `--package` / `-p` flag to specify a package file directly instead of auto-detecting from `pkg/`
+- `packages` command to list deployed packages for an Edge Function with pagination support (`--limit` / `-l`, `--cursor` / `-c`)
+- `package` command to get full details of a specific deployed package (size, deployment date, content hash)
+
 ## [0.9.1] - 2026-06-12
 
 ### Changed

@@ -144,6 +144,7 @@ In debug mode, the command additionally displays:
 - All active `AEM_EDGE_FUNCTIONS_*` environment variables
 - Edge Functions API endpoint
 - API connectivity test with token type and HTTP status
+- Table of deployed Edge Functions with their debug domain URLs (Warning: The debug URL is only for debugging, do not use it in production as it can change at any time.)
 
 ### Batch Mode
 
@@ -197,12 +198,72 @@ To be able to deploy, you need to have the "AEM Administrator" product profile f
 aio aem edge-functions deploy first-function
 ```
 
+### Skip unchanged packages
+
+The deploy command computes a hash of the package contents and compares it to the hash of the currently active package. If they match, the deploy is skipped and no upload is performed.
+
+The hash is a SHA-512 digest computed as follows:
+
+1. Decompress the `.tar.gz` archive and extract all regular files.
+2. Sort the files lexicographically by name.
+3. Concatenate the raw file contents in that order and compute the SHA-512 digest.
+
+This matches the `filesHash` field returned by the CDN API, so the comparison is exact.
+
+To force a re-deploy even when the package has not changed, use the `--force` / `-f` flag:
+
+```
+aio aem edge-functions deploy first-function --force
+```
+
+### Specifying a package file
+
+By default, the deploy command looks for a `.tar.gz` file in the `pkg/` directory (produced by the build command). To deploy a specific package file instead, use the `--package` / `-p` flag:
+
+```
+aio aem edge-functions deploy first-function --package path/to/my-package.tar.gz
+```
+
+### Debug URL
+
+After a successful deployment, the command prints the debug URL for your Edge Function:
+
+```
+View this edge function at:
+    https://edgefunction-p1234-e567890-first-function.adobeaemcloud.com
+
+Warning: This URL is only for debugging, do not use it in production as it can change at any time.
+```
+
 ### Debug Mode
 
-To see the raw, unfiltered output from the underlying CLI (useful for troubleshooting deployment issues), use the `--debug` / `-d` flag:
+To see detailed information about the deployment process (endpoint URL, package hash, hash comparison result), use the `--debug` / `-d` flag:
 
 ```
 aio aem edge-functions deploy first-function --debug
+```
+
+## List packages
+
+The following command lists all deployed packages for an edge function, newest first. The active package is highlighted.
+
+```
+aio aem edge-functions packages first-function
+```
+
+Use `--limit` / `-l` to control how many packages are returned, and `--cursor` / `-c` to fetch the next page when a cursor is shown at the bottom of the output:
+
+```
+aio aem edge-functions packages first-function --limit 5
+aio aem edge-functions packages first-function --cursor <cursor>
+```
+
+## Get package details
+
+The following command shows the full details of a specific package, including its size, deployment date, and content hash:
+
+```
+aio aem edge-functions package first-function 42
 ```
 
 ## Local run
