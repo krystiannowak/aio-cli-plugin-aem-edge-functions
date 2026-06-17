@@ -322,10 +322,12 @@ class InfoCommand extends BaseCommand {
             }
 
             if (accessToken) {
-              const response = await fetch(apiEndpoint, {
+              this.spinnerStart('Testing API connectivity...');
+              const response = await fetch(`${apiEndpoint}/edgeFunctions`, {
                 method: 'GET',
                 headers: { Authorization: `Bearer ${accessToken}` }
               });
+              this.spinnerStop();
 
               if (response.ok) {
                 console.log(
@@ -333,117 +335,91 @@ class InfoCommand extends BaseCommand {
                 );
                 console.log(`Token Type:             ${chalk.cyan(tokenType)}`);
 
-                let body;
+                let listBody;
                 try {
-                  body = await response.json();
+                  listBody = await response.json();
                 } catch {
-                  body = null;
+                  listBody = null;
                 }
 
-                if (body) {
-                  const isEdgeDelivery =
-                    this.getConfig(this.CONFIG_EDGE_DELIVERY) ||
-                    this.getConfig(this.CONFIG_EDGE_DELIVERY_LEGACY);
-                  const expectedKind = isEdgeDelivery ? 'adobemanagedcdn' : 'aemcs';
+                const functions = listBody?.items || [];
+                this.spinnerStart('Loading Edge Function details...');
+                const rows = [];
+                for (const ef of functions) {
+                  const name = ef.name || ef.edgeFunctionName || '?';
+                  let debugDomain = '-';
+                  let error = false;
+                  try {
+                    const efRes = await fetch(`${apiEndpoint}/edgeFunctions/${name}`, {
+                      method: 'GET',
+                      headers: { Authorization: `Bearer ${accessToken}` }
+                    });
+                    if (efRes.ok) {
+                      const efBody = await efRes.json();
+                      debugDomain = efBody.debugDomain ? `https://${efBody.debugDomain}` : '-';
+                    } else {
+                      error = true;
+                    }
+                  } catch {
+                    error = true;
+                  }
+                  rows.push({ name, debugDomain, error });
+                }
+                this.spinnerStop();
 
-                  const programMatch = String(body.programId) === String(programId);
-                  const envMatch =
-                    !environmentId || String(body.environmentId) === String(environmentId);
-                  const kindMatch = !body.bucketType || body.bucketType === expectedKind;
-
-                  console.log(
-                    `  Program ID:           ${programMatch ? chalk.green(`✓ ${body.programId}`) : chalk.red(`✗ ${body.programId} (expected ${programId})`)}`
+                console.log(chalk.bold('\nEdge Functions:'));
+                if (rows.length === 0) {
+                  console.log(chalk.dim('  No Edge Functions found for this environment.'));
+                } else {
+                  const nameWidth = Math.max('NAME'.length, ...rows.map((r) => r.name.length));
+                  const domainWidth = Math.max(
+                    'DEBUG URL (Warning: May change at any time)'.length,
+                    ...rows.map((r) => r.debugDomain.length)
                   );
-                  if (body.environmentId !== undefined) {
-                    console.log(
-                      `  Environment ID:       ${envMatch ? chalk.green(`✓ ${body.environmentId}`) : chalk.red(`✗ ${body.environmentId} (expected ${environmentId})`)}`
-                    );
-                  }
-                  if (body.bucketType !== undefined) {
-                    console.log(
-                      `  Environment Kind:     ${kindMatch ? chalk.green(`✓ ${body.bucketType}`) : chalk.yellow(`⚠ ${body.bucketType} (expected ${expectedKind})`)}`
-                    );
+                  console.log(
+                    chalk.bold(
+                      `  ${'NAME'.padEnd(nameWidth)}    ${'DEBUG URL (Warning: May change at any time)'.padEnd(domainWidth)}`
+                    )
+                  );
+                  for (const { name, debugDomain, error } of rows) {
+                    const domainCell = error
+                      ? chalk.red('error fetching details')
+                      : chalk.cyan(debugDomain);
+                    console.log(`  ${chalk.green(name.padEnd(nameWidth))}    ${domainCell}`);
                   }
                 }
-                // List edge functions with their debug domains
-                try {
-                  this.spinnerStart('Loading Edge Functions...');
-                  const efListRes = await fetch(`${apiEndpoint}/edgeFunctions`, {
-                    method: 'GET',
-                    headers: { Authorization: `Bearer ${accessToken}` }
-                  });
-                  if (efListRes.ok) {
-                    const efListBody = await efListRes.json();
-                    const functions = efListBody?.items || [];
-                    const rows = [];
-                    for (const ef of functions) {
-                      const name = ef.name || ef.edgeFunctionName || '?';
-                      let debugDomain = '-';
-                      let error = false;
-                      try {
-                        const efRes = await fetch(`${apiEndpoint}/edgeFunctions/${name}`, {
-                          method: 'GET',
-                          headers: { Authorization: `Bearer ${accessToken}` }
-                        });
-                        if (efRes.ok) {
-                          const efBody = await efRes.json();
-                          debugDomain = efBody.debugDomain ? `https://${efBody.debugDomain}` : '-';
-                        } else {
-                          error = true;
-                        }
-                      } catch {
-                        error = true;
-                      }
-                      rows.push({ name, debugDomain, error });
-                    }
-                    this.spinnerStop();
-
-                    if (rows.length > 0) {
-                      console.log(chalk.bold('\nEdge Functions:'));
-                      const nameWidth = Math.max('NAME'.length, ...rows.map((r) => r.name.length));
-                      const domainWidth = Math.max(
-                        'DEBUG URL (Warning: May change at any time)'.length,
-                        ...rows.map((r) => r.debugDomain.length)
-                      );
-                      console.log(
-                        chalk.bold(
-                          `  ${'NAME'.padEnd(nameWidth)}    ${'DEBUG URL (Warning: May change at any time)'.padEnd(domainWidth)}`
-                        )
-                      );
-                      for (const { name, debugDomain, error } of rows) {
-                        const domainCell = error
-                          ? chalk.red('error fetching details')
-                          : chalk.cyan(debugDomain);
-                        console.log(`  ${chalk.green(name.padEnd(nameWidth))}    ${domainCell}`);
-                      }
-                    }
-                  } else {
-                    this.spinnerStop();
-                  }
-                } catch {
-                  this.spinnerStop();
-                  // ignore — edge functions list is supplemental
-                }
-              } else if (response.status === 401 || response.status === 403) {
-                console.log(
-                  `API Status:             ${chalk.red('✗ Authentication failed')} (HTTP ${response.status})`
-                );
-                console.log(`Token Type:             ${chalk.cyan(tokenType)}`);
-              } else if (response.status === 404) {
-                console.log(
-                  `API Status:             ${chalk.red('✗ Endpoint not found')} (HTTP 404)`
-                );
-                console.log(`Token Type:             ${chalk.cyan(tokenType)}`);
-                console.log(
-                  chalk.yellow(
-                    '  The API endpoint was not found. Check your program/environment configuration.'
-                  )
-                );
               } else {
-                console.log(
-                  `API Status:             ${chalk.yellow('⚠ Unexpected response')} (HTTP ${response.status})`
-                );
+                let detail = null;
+                try {
+                  const errBody = await response.json();
+                  detail = errBody?.detail || null;
+                } catch {
+                  // ignore
+                }
+                const requestId = response.headers?.get('x-request-id');
+
+                if (response.status === 401 || response.status === 403) {
+                  console.log(
+                    `API Status:             ${chalk.red('✗ Authentication failed')} (HTTP ${response.status})`
+                  );
+                } else if (response.status === 404) {
+                  console.log(
+                    `API Status:             ${chalk.red('✗ Endpoint not found')} (HTTP 404)`
+                  );
+                  console.log(
+                    chalk.yellow(
+                      '  The API endpoint was not found. Check your program/environment configuration.'
+                    )
+                  );
+                } else {
+                  console.log(
+                    `API Status:             ${chalk.yellow('⚠ Unexpected response')} (HTTP ${response.status})`
+                  );
+                }
+
                 console.log(`Token Type:             ${chalk.cyan(tokenType)}`);
+                if (detail) console.log(`Detail:                 ${chalk.yellow(detail)}`);
+                if (requestId) console.log(`Request ID:             ${chalk.dim(requestId)}`);
               }
             } else {
               console.log(`API Status:             ${chalk.red('✗ No access token available')}`);
