@@ -203,6 +203,7 @@ aio aem edge-functions deploy first-function
 The deploy command computes a hash of the package contents and compares it to the hash of the currently active package. If they match, the deploy is skipped and no upload is performed.
 
 The hash is a SHA-512 digest computed as follows:
+
 1. Decompress the `.tar.gz` archive and extract all regular files.
 2. Sort the files lexicographically by name.
 3. Concatenate the raw file contents in that order and compute the SHA-512 digest.
