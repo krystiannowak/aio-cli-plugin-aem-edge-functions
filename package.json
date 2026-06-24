@@ -1,7 +1,7 @@
 {
   "name": "@adobe/aio-cli-plugin-aem-edge-functions",
   "description": "Adobe I/O CLI plugin for interacting with AEM Edge Functions",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "author": "Adobe Inc.",
   "engines": {
     "npm": ">= 8.0.0",
@@ -12,9 +12,9 @@
     "@adobe/aio-lib-core-config": "5.0.1",
     "@adobe/aio-lib-core-networking": "5.1.0",
     "@adobe/aio-lib-ims": "8.1.1",
-    "@fastly/cli": "14.3.1",
+    "@fastly/cli": "15.2.0",
     "@inquirer/prompts": "8.3.0",
-    "@oclif/core": "2.16.0",
+    "@oclif/core": "4.11.11",
     "chalk": "4.1.2",
     "jsonwebtoken": "9.0.3",
     "open": "10.2.0",
