@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1] - 2026-06-24
+
+### Changed
+
+- Upgraded `@fastly/cli` from 14.3.1 to 15.2.0
+- Upgraded `@oclif/core` from 2.16.0 to 4.11.11
+
 ## [0.10.0] - 2026-06-16
 
 ### Added
